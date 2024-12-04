@@ -6,17 +6,31 @@
   <meta name="renderer" content="webkit">
   <meta http-equiv="X-UA-Compatible" content="IE=edge" >
   <link rel="dns-prefetch" href="http://example.com">
-  <title>Archives: 2024 | Yintong&#39;s Blog</title>
+  <title>redis解决优惠券秒杀 | Yintong&#39;s Blog</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description" content="今天是上天的恩赐">
-<meta property="og:type" content="website">
-<meta property="og:title" content="Yintong&#39;s Blog">
-<meta property="og:url" content="http://example.com/archives/2024/index.html">
+  <meta name="description" content="全局唯一ID问题的出现每个店铺都可以发布优惠券： 当用户抢购时，就会生成订单并保存到 tb_voucher_order 这张表中，而订单表如果使用数据库自增ID就存在一些问题：  id的规律性太明显  比如说， 我今天12：00订购代金券，返回给用户id为10 第二天12：00再订购，返回给用户id为100 就会暴露给用户这个24h的销量   受单表数量的限制  mysql中单表存储数量有限，必要">
+<meta property="og:type" content="article">
+<meta property="og:title" content="redis解决优惠券秒杀">
+<meta property="og:url" content="http://example.com/2024/11/30/redis%E8%A7%A3%E5%86%B3%E4%BC%98%E6%83%A0%E5%88%B8%E7%A7%92%E6%9D%80/index.html">
 <meta property="og:site_name" content="Yintong&#39;s Blog">
-<meta property="og:description" content="今天是上天的恩赐">
+<meta property="og:description" content="全局唯一ID问题的出现每个店铺都可以发布优惠券： 当用户抢购时，就会生成订单并保存到 tb_voucher_order 这张表中，而订单表如果使用数据库自增ID就存在一些问题：  id的规律性太明显  比如说， 我今天12：00订购代金券，返回给用户id为10 第二天12：00再订购，返回给用户id为100 就会暴露给用户这个24h的销量   受单表数量的限制  mysql中单表存储数量有限，必要">
 <meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241130173514393.png">
+<meta property="og:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241130174411762.png">
+<meta property="og:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241130175258708.png">
+<meta property="og:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241202181640116.png">
+<meta property="og:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241204154547696.png">
+<meta property="og:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241204154639195.png">
+<meta property="og:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241204155404858.png">
+<meta property="og:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241204155640959.png">
+<meta property="og:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241204193522367.png">
+<meta property="og:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241204195033190.png">
+<meta property="article:published_time" content="2024-11-30T08:54:08.000Z">
+<meta property="article:modified_time" content="2024-12-04T14:34:19.853Z">
 <meta property="article:author" content="Yintong">
+<meta property="article:tag" content="后端">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241130173514393.png">
   
     <link rel="alternative" href="/atom.xml" title="Yintong&#39;s Blog" type="application/atom+xml">
   
@@ -154,36 +168,167 @@
             <canvas data-colors="#eaeaea" data-sectionHeight="100" data-contentId="js-content" id="myCanvas1" class="anm-canvas"></canvas>
           </div>
           <div id="js-content" class="content-ll">
-            
+            <article id="post-redis解决优惠券秒杀" class="article article-type-post " itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
   
+    <h1 class="article-title" itemprop="name">
+      redis解决优惠券秒杀
+    </h1>
   
-    
-    
-      
-      
-      <section class="archives-wrap">
-        <div class="archive-year-wrap">
-          <a href="/archives/2024" class="archive-year">2024</a>
-        </div>
-        <div class="archives">
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2024/11/30/redis%E8%A7%A3%E5%86%B3%E4%BC%98%E6%83%A0%E5%88%B8%E7%A7%92%E6%9D%80/" class="archive-article-date">
+
+        
+        <a href="/2024/11/30/redis%E8%A7%A3%E5%86%B3%E4%BC%98%E6%83%A0%E5%88%B8%E7%A7%92%E6%9D%80/" class="archive-article-date">
   	<time datetime="2024-11-30T08:54:08.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-11-30</time>
 </a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2024/11/30/redis%E8%A7%A3%E5%86%B3%E4%BC%98%E6%83%A0%E5%88%B8%E7%A7%92%E6%9D%80/">redis解决优惠券秒杀</a>
-    </h1>
-  
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h1 id="全局唯一ID"><a href="#全局唯一ID" class="headerlink" title="全局唯一ID"></a>全局唯一ID</h1><h2 id="问题的出现"><a href="#问题的出现" class="headerlink" title="问题的出现"></a>问题的出现</h2><p>每个店铺都可以发布优惠券：<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241130173514393.png" alt="image-20241130173514393"></p>
+<p>当用户抢购时，就会生成订单并保存到 <code>tb_voucher_order</code> 这张表中，而订单表如果使用数据库自增ID就存在一些问题：</p>
+<ul>
+<li><p>id的规律性太明显</p>
+<blockquote>
+<p>比如说，</p>
+<p>我今天12：00订购代金券，返回给用户id为10</p>
+<p>第二天12：00再订购，返回给用户id为100</p>
+<p>就会暴露给用户这个24h的销量</p>
+</blockquote>
+</li>
+<li><p>受单表数量的限制</p>
+<blockquote>
+<p>mysql中单表存储数量有限，必要时需要多表存储同一数据</p>
+<p>但是普通的自增会导致id重复（在不同表中，每个表各自计算自增长）</p>
+</blockquote>
+</li>
+</ul>
+<h2 id="全局id生成器"><a href="#全局id生成器" class="headerlink" title="全局id生成器"></a>全局id生成器</h2><p>能生成全局唯一id的工具</p>
+<img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241130174411762.png" alt="image-20241130174411762" style="zoom:50%;">
 
-        <div class="article-info info-on-right">
-          
+<p>可以用redis满足以上五个条件，但是安全性的保证需要其他操作（毕竟不能简单的自增，会被识别出规律）</p>
+<p><strong>安全性：</strong></p>
+<p>id的结构</p>
+<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241130175258708.png" alt="image-20241130175258708"></p>
+<blockquote>
+<p><strong>符号位：</strong></p>
+<p>第一位，始终为0表示非负数</p>
+<p><strong>时间戳：</strong></p>
+<p>我们会定一个初始的时间，比如说2000年1月1号，时间戳记录的就是下单时间和这个初始时间锁所差的秒数</p>
+<p><strong>序列号：</strong></p>
+<p>可以避免同一秒中有重复id，理论上支持一秒钟有2^32个订单量</p>
+</blockquote>
+<p><strong>全局唯一ID生成器（利用Redis）</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">RedisIdWorker</span> &#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 开始时间戳</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">long</span> <span class="variable">BEGIN_TIMESTAMP</span> <span class="operator">=</span> <span class="number">1640995200</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 序列号的位数</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">int</span> <span class="variable">COUNT_BITS</span> <span class="operator">=</span> <span class="number">32</span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> StringRedisTemplate stringRedisTemplate;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="type">long</span> <span class="title function_">nextId</span><span class="params">(String keyPrefix)</span>&#123;</span><br><span class="line">        <span class="comment">// 生成时间戳</span></span><br><span class="line">        <span class="type">LocalDateTime</span> <span class="variable">now</span> <span class="operator">=</span> LocalDateTime.now();</span><br><span class="line">        <span class="type">long</span> <span class="variable">nowSecond</span> <span class="operator">=</span> now.toEpochSecond(ZoneOffset.UTC);</span><br><span class="line">        <span class="type">long</span> <span class="variable">timestamp</span> <span class="operator">=</span> nowSecond - BEGIN_TIMESTAMP;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 生成序列号(借助redis的自增长）</span></span><br><span class="line">        <span class="type">String</span> <span class="variable">date</span> <span class="operator">=</span> now.format(DateTimeFormatter.ofPattern(<span class="string">&quot;yyyy:MM:dd&quot;</span>));</span><br><span class="line">        <span class="type">Long</span> <span class="variable">count</span> <span class="operator">=</span> stringRedisTemplate.opsForValue().increment(<span class="string">&quot;icr:&quot;</span> + keyPrefix + <span class="string">&quot;:&quot;</span> + date);</span><br><span class="line"></span><br><span class="line">        <span class="comment">//拼接并返回</span></span><br><span class="line">        <span class="keyword">return</span> timestamp &lt;&lt; COUNT_BITS | count;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+
+
+<h1 id="实现优惠券秒杀下单"><a href="#实现优惠券秒杀下单" class="headerlink" title="实现优惠券秒杀下单"></a>实现优惠券秒杀下单</h1><h2 id="初步实现"><a href="#初步实现" class="headerlink" title="初步实现"></a>初步实现</h2><p>下单时需要判断：</p>
+<ul>
+<li>秒杀是否开始或结束，如果尚未开始或已经结束则无法下单</li>
+<li>库存是否充足，不足则无法下单</li>
+</ul>
+<p>逻辑：</p>
+<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241202181640116.png" alt="image-20241202181640116"></p>
+<p>但是！以上的解决方法当线程多了的话，就可能出<strong>库存超卖问题</strong>：</p>
+<h2 id="库存超卖问题！"><a href="#库存超卖问题！" class="headerlink" title="库存超卖问题！"></a>库存超卖问题！</h2><h3 id="解决逻辑"><a href="#解决逻辑" class="headerlink" title="解决逻辑"></a>解决逻辑</h3><p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241204154547696.png" alt="image-20241204154547696"></p>
+<p>以上情况就会导致库存为-1，这不合理，得加锁</p>
+<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241204154639195.png" alt="image-20241204154639195"></p>
+<p><strong>悲观锁：</strong></p>
+<p> 悲观锁可以实现对于数据的串行化执行，比如syn，和lock都是悲观锁的代表，同时，悲观锁中又可以再细分为公平锁，非公平锁，可重入锁，等等</p>
+<p><strong>乐观锁：</strong></p>
+<ul>
+<li><p>版本号法</p>
+<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241204155404858.png" alt="image-20241204155404858"></p>
+</li>
+<li><p>cas法</p>
+<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241204155640959.png" alt="image-20241204155640959"></p>
+</li>
+</ul>
+<blockquote>
+<p>我们可以看到，乐观锁的逻辑是<strong>查看数据是否被修改过</strong></p>
+<p>既然是修改，所以是update操作</p>
+<p>常用操作： <strong>update ——&gt; 乐观锁</strong></p>
+</blockquote>
+<h3 id="业务实现"><a href="#业务实现" class="headerlink" title="业务实现"></a>业务实现</h3><p><strong>修改代码方案一：</strong></p>
+<p>VoucherOrderServiceImpl 在扣减库存时，改为：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">        <span class="type">boolean</span> <span class="variable">success</span> <span class="operator">=</span> seckillVoucherService.update()</span><br><span class="line">                .setSql(<span class="string">&quot;stock = stock - 1&quot;</span>)<span class="comment">//set stock = stock -1</span></span><br><span class="line">                .eq(<span class="string">&quot;voucher_id&quot;</span>, voucherId)</span><br><span class="line">                .eq(<span class="string">&quot;stock&quot;</span>, voucher.getStock())</span><br><span class="line">                .update();</span><br><span class="line"><span class="comment">//where id = ？ and stock = ?</span></span><br></pre></td></tr></table></figure>
+
+<p>重点在于：</p>
+<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241204193522367.png" alt="image-20241204193522367"></p>
+<p>这个👆就是在执行数据库操作的时候校验库存是否发生变化</p>
+<p>以上代码逻辑的核心含义是：只要我扣减库存时的库存和之前我查询到的库存是一样的，就意味着没有人在中间修改过库存，那么此时就是安全的</p>
+<p><strong>测试：</strong></p>
+<img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241204195033190.png" alt="image-20241204195033190" style="zoom:50%;">
+
+<p>异常概率太高了！</p>
+<p><strong>原因：</strong>使用乐观锁过程中假设100个线程同时都拿到了100的库存，然后大家一起去进行扣减，但是100个人中只有1个人能扣减成功，其他的人在处理时，他们在扣减时，库存已经被修改过了，所以此时其他线程都会失败</p>
+<p><strong>修改代码方案二，高成功率版：</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">boolean</span> <span class="variable">success</span> <span class="operator">=</span> seckillVoucherService.update()</span><br><span class="line">            .setSql(<span class="string">&quot;stock= stock -1&quot;</span>)</span><br><span class="line">            .eq(<span class="string">&quot;voucher_id&quot;</span>, voucherId).update().gt(<span class="string">&quot;stock&quot;</span>,<span class="number">0</span>); <span class="comment">//where id = ? and stock &gt; 0</span></span><br></pre></td></tr></table></figure>
+
+<p>不需要每次检查库存是否等于之前查询的库存，因为只要当前库存大于 0，说明扣减库存不会导致库存不合理的状态（比如出现负库存）。</p>
+<p>这个方案二相较于方案一效率更高，但是不是所有的情况都可以用方案二</p>
+<p>比如说有的业务就需要检查数据是否完全没被操作过，就不能用方案二</p>
+<h2 id="优惠券秒杀-一人一单"><a href="#优惠券秒杀-一人一单" class="headerlink" title="优惠券秒杀-一人一单"></a>优惠券秒杀-一人一单</h2><p>有的优惠券需要限购一人一单：</p>
+<p>所以我们加上初步代码：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 一人一单</span></span><br><span class="line"><span class="comment">//查询订单</span></span><br><span class="line"><span class="type">long</span> <span class="variable">userId</span> <span class="operator">=</span> UserHolder.getUser().getId();</span><br><span class="line"><span class="type">Integer</span> <span class="variable">count</span> <span class="operator">=</span> query().eq(<span class="string">&quot;user_id&quot;</span>, userId).eq(<span class="string">&quot;voucher_id&quot;</span>, voucherId).count();</span><br><span class="line"><span class="comment">//判断订单是否存在</span></span><br><span class="line"><span class="keyword">if</span>(count &gt; <span class="number">0</span>)&#123;</span><br><span class="line">    <span class="keyword">return</span> Result.fail(<span class="string">&quot;用户已经购买过一次！&quot;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>但是实际上这种操作在高并发的情况下会出问题，一个用户仍然可以购买很多</p>
+<p>之前说到过，update操作适合用乐观锁</p>
+<p>那这种insert操作就要用<strong>悲观锁</strong>（毕竟没什么可以重复检查的数据，insert之前都没得数据）</p>
+<blockquote>
+<p>我们看一下锁的范围有何区别：</p>
+<p><strong>方法一：锁整个方法：（锁对象为this）</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Transactional</span></span><br><span class="line">   <span class="keyword">public</span> <span class="keyword">synchronized</span> Result <span class="title function_">creatVoucherOrder</span><span class="params">(Long voucherId)</span> &#123;</span><br><span class="line">       <span class="comment">// 一人一单</span></span><br><span class="line">       <span class="comment">//查询订单</span></span><br><span class="line">       <span class="type">long</span> <span class="variable">userId</span> <span class="operator">=</span> UserHolder.getUser().getId();</span><br><span class="line">       <span class="type">Integer</span> <span class="variable">count</span> <span class="operator">=</span> query().eq(<span class="string">&quot;user_id&quot;</span>, userId).eq(<span class="string">&quot;voucher_id&quot;</span>, voucherId).count();</span><br><span class="line">       <span class="comment">//判断订单是否存在</span></span><br><span class="line">       <span class="keyword">if</span>(count &gt; <span class="number">0</span>)&#123;</span><br><span class="line">           <span class="keyword">return</span> Result.fail(<span class="string">&quot;用户已经购买过一次！&quot;</span>);</span><br><span class="line">       &#125;</span><br><span class="line">       </span><br><span class="line">       <span class="comment">// ………………其他代码</span></span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<ol>
+<li><p>如果多个用户同时调用这个方法，<strong>它们会被串行化</strong>。因为同一个实例对象的锁是全局共享的，所有线程都必须排队等候获取锁，无法并行执行，导致<strong>性能瓶颈</strong>。</p>
+</li>
+<li><p>即使是 <strong>不同用户</strong>，由于他们可能共享同一个 <code>VoucherOrderServiceImpl</code> 的实例，线程会被阻塞，进而影响到并发性能。</p>
+</li>
+</ol>
+<p><strong>方法二：锁id以下的方法：（userId作为锁对象）</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Transactional</span></span><br><span class="line">    <span class="keyword">public</span> Result <span class="title function_">creatVoucherOrder</span><span class="params">(Long voucherId)</span> &#123;</span><br><span class="line">        <span class="comment">// 一人一单</span></span><br><span class="line">        <span class="comment">//查询订单</span></span><br><span class="line">        <span class="type">Long</span> <span class="variable">userId</span> <span class="operator">=</span> UserHolder.getUser().getId();</span><br><span class="line">        <span class="keyword">synchronized</span> (userId.toString()) &#123;</span><br><span class="line">            <span class="type">Integer</span> <span class="variable">count</span> <span class="operator">=</span> query().eq(<span class="string">&quot;user_id&quot;</span>, userId).eq(<span class="string">&quot;voucher_id&quot;</span>, voucherId).count();</span><br><span class="line">            <span class="comment">//判断订单是否存在</span></span><br><span class="line">            <span class="keyword">if</span> (count &gt; <span class="number">0</span>) &#123;</span><br><span class="line">                <span class="keyword">return</span> Result.fail(<span class="string">&quot;用户已经购买过一次！&quot;</span>);</span><br><span class="line">            &#125;</span><br><span class="line">            </span><br><span class="line">            <span class="comment">// ………………其他代码</span></span><br></pre></td></tr></table></figure>
+
+<ol>
+<li><p><strong>粒度更小</strong>：每个用户的操作有自己独立的锁，不同的用户之间互不干扰。这意味着多个用户可以并行执行方法，从而提高并发性能。</p>
+</li>
+<li><p><strong>锁争用减少</strong>：不同用户请求的时候，它们锁定的 <code>userId</code> 不同，因此不会发生锁争用（除非不同用户的 <code>userId</code> 恰好相同，这种情况可以通过其他方式处理）。在这种情况下，线程并发性更好，效率更高。</p>
+</li>
+</ol>
+</blockquote>
+
+      
+
+      
+        <div class="page-reward">
+          <a href="javascript:;" class="page-reward-btn tooltip-top">
+            <div class="tooltip tooltip-east">
+            <span class="tooltip-item">
+              赏
+            </span>
+            <span class="tooltip-content">
+              <span class="tooltip-text">
+                <span class="tooltip-inner">
+                  <p class="reward-p"><i class="icon icon-quo-left"></i>谢谢你请我吃糖果<i class="icon icon-quo-right"></i></p>
+                  <div class="reward-box">
+                    
+                    
+                  </div>
+                </span>
+              </span>
+            </span>
+          </div>
+          </a>
+        </div>
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
 	<div class="article-tag tagcloud">
 		<i class="icon-price-tags icon"></i>
 		<ul class="article-tag-list">
@@ -195,361 +340,106 @@
 		</ul>
 	</div>
 
-          
+      
 
+      
+
+      
+        
+<div class="share-btn share-icons tooltip-left">
+  <div class="tooltip tooltip-east">
+    <span class="tooltip-item">
+      <a href="javascript:;" class="share-sns share-outer">
+        <i class="icon icon-share"></i>
+      </a>
+    </span>
+    <span class="tooltip-content">
+      <div class="share-wrap">
+        <div class="share-icons">
+          <a class="weibo share-sns" href="javascript:;" data-type="weibo">
+            <i class="icon icon-weibo"></i>
+          </a>
+          <a class="weixin share-sns wxFab" href="javascript:;" data-type="weixin">
+            <i class="icon icon-weixin"></i>
+          </a>
+          <a class="qq share-sns" href="javascript:;" data-type="qq">
+            <i class="icon icon-qq"></i>
+          </a>
+          <a class="douban share-sns" href="javascript:;" data-type="douban">
+            <i class="icon icon-douban"></i>
+          </a>
+          <a class="qzone share-sns" href="javascript:;" data-type="qzone">
+            <i class="icon icon-qzone"></i>
+          </a>
+          <a class="facebook share-sns" href="javascript:;" data-type="facebook">
+            <i class="icon icon-facebook"></i>
+          </a>
+          <a class="twitter share-sns" href="javascript:;" data-type="twitter">
+            <i class="icon icon-twitter"></i>
+          </a>
+          <a class="google share-sns" href="javascript:;" data-type="google">
+            <i class="icon icon-google"></i>
+          </a>
         </div>
-        <div class="clearfix"></div>
-    </header>
+      </div>
+    </span>
+  </div>
+</div>
+
+<div class="page-modal wx-share js-wx-box">
+    <a class="close js-modal-close" href="javascript:;"><i class="icon icon-close"></i></a>
+    <p>扫一扫，分享到微信</p>
+    <div class="wx-qrcode">
+      <img src="//pan.baidu.com/share/qrcode?url=http://example.com/2024/11/30/redis%E8%A7%A3%E5%86%B3%E4%BC%98%E6%83%A0%E5%88%B8%E7%A7%92%E6%9D%80/" alt="微信分享二维码">
+    </div>
+</div>
+
+<div class="mask js-mask"></div>
+      
+      <div class="clearfix"></div>
+    </div>
   </div>
 </article>
+
   
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2024/11/27/%E7%BC%93%E5%AD%98%E5%B7%A5%E5%85%B7%E7%9A%84%E5%B0%81%E8%A3%85%EF%BC%88%E4%BD%BF%E7%94%A8StringRedisTemplate/" class="archive-article-date">
-  	<time datetime="2024-11-27T01:11:33.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-11-27</time>
-</a>
+<nav id="article-nav">
+  
+  
+    <a href="/2024/11/27/%E7%BC%93%E5%AD%98%E5%B7%A5%E5%85%B7%E7%9A%84%E5%B0%81%E8%A3%85%EF%BC%88%E4%BD%BF%E7%94%A8StringRedisTemplate/" id="article-nav-older" class="article-nav-link-wrap">
+      <div class="article-nav-title">缓存工具的封装（使用StringRedisTemplate)</div>
+      <i class="icon-circle-right"></i>
+    </a>
+  
+</nav>
+
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
         </div>
-    	 
+        
+        
+    </div>
+</aside>
+
+
+
   
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2024/11/27/%E7%BC%93%E5%AD%98%E5%B7%A5%E5%85%B7%E7%9A%84%E5%B0%81%E8%A3%85%EF%BC%88%E4%BD%BF%E7%94%A8StringRedisTemplate/">缓存工具的封装（使用StringRedisTemplate)</a>
-    </h1>
+  
   
 
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">后端</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2024/11/26/mysql%E9%9D%A2%E8%AF%95%E9%A2%98/" class="archive-article-date">
-  	<time datetime="2024-11-26T02:00:40.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-11-26</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2024/11/26/mysql%E9%9D%A2%E8%AF%95%E9%A2%98/">mysql面试题</a>
-    </h1>
   
 
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">后端</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2024/11/14/%E9%9D%A2%E8%AF%95%E9%A2%98%E2%80%94%E2%80%94redis/" class="archive-article-date">
-  	<time datetime="2024-11-14T11:24:34.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-11-14</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2024/11/14/%E9%9D%A2%E8%AF%95%E9%A2%98%E2%80%94%E2%80%94redis/">面试题——redis</a>
-    </h1>
   
 
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">后端</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
   
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2024/11/07/%E7%94%A8redis%E6%9D%A5%E7%BC%93%E5%AD%98%E4%BB%A5%E5%8F%8A%E7%9B%B8%E5%85%B3%E9%97%AE%E9%A2%98/" class="archive-article-date">
-  	<time datetime="2024-11-07T01:47:52.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-11-07</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2024/11/07/%E7%94%A8redis%E6%9D%A5%E7%BC%93%E5%AD%98%E4%BB%A5%E5%8F%8A%E7%9B%B8%E5%85%B3%E9%97%AE%E9%A2%98/">用redis来缓存以及相关问题</a>
-    </h1>
-  
-
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">后端</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2024/11/06/java%E5%A4%9A%E7%BA%BF%E7%A8%8B%E7%BC%96%E7%A8%8B/" class="archive-article-date">
-  	<time datetime="2024-11-06T01:41:59.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-11-06</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2024/11/06/java%E5%A4%9A%E7%BA%BF%E7%A8%8B%E7%BC%96%E7%A8%8B/">java多线程编程</a>
-    </h1>
-  
-
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">后端</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2024/11/04/redis%E7%9A%84%E7%AE%80%E5%8D%95%E4%BD%BF%E7%94%A8%E2%80%9C/" class="archive-article-date">
-  	<time datetime="2024-11-04T08:33:24.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-11-04</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2024/11/04/redis%E7%9A%84%E7%AE%80%E5%8D%95%E4%BD%BF%E7%94%A8%E2%80%9C/">redis的简单使用“</a>
-    </h1>
-  
-
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">后端</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2024/11/04/VUE%E7%BB%84%E4%BB%B6%E5%BA%93Element%E7%9A%84%E7%AE%80%E5%8D%95%E4%BD%BF%E7%94%A8/" class="archive-article-date">
-  	<time datetime="2024-11-04T06:27:46.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-11-04</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2024/11/04/VUE%E7%BB%84%E4%BB%B6%E5%BA%93Element%E7%9A%84%E7%AE%80%E5%8D%95%E4%BD%BF%E7%94%A8/">VUE组件库Element的简单使用</a>
-    </h1>
-  
-
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">前端</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2024/11/01/Tomcat%E9%9B%86%E7%BE%A4%E7%9A%84session%E5%85%B1%E4%BA%AB%E9%97%AE%E9%A2%98/" class="archive-article-date">
-  	<time datetime="2024-11-01T01:18:29.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-11-01</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2024/11/01/Tomcat%E9%9B%86%E7%BE%A4%E7%9A%84session%E5%85%B1%E4%BA%AB%E9%97%AE%E9%A2%98/">Tomcat集群的session共享问题（用redis+session完成登录功能）</a>
-    </h1>
-  
-
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">后端</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2024/10/31/VUE%E7%9A%84%E7%AE%80%E5%8D%95%E4%BD%BF%E7%94%A8/" class="archive-article-date">
-  	<time datetime="2024-10-31T05:53:15.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-10-31</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2024/10/31/VUE%E7%9A%84%E7%AE%80%E5%8D%95%E4%BD%BF%E7%94%A8/">VUE的简单使用</a>
-    </h1>
-  
-
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">前端</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-  
-    </div></section>
-  
-
-    
 
 
           </div>
@@ -572,8 +462,8 @@
 	var yiliaConfig = {
 		mathjax: false,
 		isHome: false,
-		isPost: false,
-		isArchive: true,
+		isPost: true,
+		isArchive: false,
 		isTag: false,
 		isCategory: false,
 		open_in_new: false,
