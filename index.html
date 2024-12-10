@@ -260,7 +260,7 @@
 <p>不需要每次检查库存是否等于之前查询的库存，因为只要当前库存大于 0，说明扣减库存不会导致库存不合理的状态（比如出现负库存）。</p>
 <p>这个方案二相较于方案一效率更高，但是不是所有的情况都可以用方案二</p>
 <p>比如说有的业务就需要检查数据是否完全没被操作过，就不能用方案二</p>
-<h2 id="优惠券秒杀-一人一单"><a href="#优惠券秒杀-一人一单" class="headerlink" title="优惠券秒杀-一人一单"></a>优惠券秒杀-一人一单</h2><p>有的优惠券需要限购一人一单：</p>
+<h2 id="优惠券秒杀-一人一单（单体项目版本）"><a href="#优惠券秒杀-一人一单（单体项目版本）" class="headerlink" title="优惠券秒杀-一人一单（单体项目版本）"></a>优惠券秒杀-一人一单（单体项目版本）</h2><p>有的优惠券需要限购一人一单：</p>
 <p>所以我们加上初步代码：</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 一人一单</span></span><br><span class="line"><span class="comment">//查询订单</span></span><br><span class="line"><span class="type">long</span> <span class="variable">userId</span> <span class="operator">=</span> UserHolder.getUser().getId();</span><br><span class="line"><span class="type">Integer</span> <span class="variable">count</span> <span class="operator">=</span> query().eq(<span class="string">&quot;user_id&quot;</span>, userId).eq(<span class="string">&quot;voucher_id&quot;</span>, voucherId).count();</span><br><span class="line"><span class="comment">//判断订单是否存在</span></span><br><span class="line"><span class="keyword">if</span>(count &gt; <span class="number">0</span>)&#123;</span><br><span class="line">    <span class="keyword">return</span> Result.fail(<span class="string">&quot;用户已经购买过一次！&quot;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
@@ -270,7 +270,7 @@
 <blockquote>
 <p>我们看一下锁的范围有何区别：</p>
 <p><strong>方法一：锁整个方法：（锁对象为this）</strong></p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Transactional</span></span><br><span class="line">   <span class="keyword">public</span> <span class="keyword">synchronized</span> Result <span class="title function_">creatVoucherOrder</span><span class="params">(Long voucherId)</span> &#123;</span><br><span class="line">       <span class="comment">// 一人一单</span></span><br><span class="line">       <span class="comment">//查询订单</span></span><br><span class="line">       <span class="type">long</span> <span class="variable">userId</span> <span class="operator">=</span> UserHolder.getUser().getId();</span><br><span class="line">       <span class="type">Integer</span> <span class="variable">count</span> <span class="operator">=</span> query().eq(<span class="string">&quot;user_id&quot;</span>, userId).eq(<span class="string">&quot;voucher_id&quot;</span>, voucherId).count();</span><br><span class="line">       <span class="comment">//判断订单是否存在</span></span><br><span class="line">       <span class="keyword">if</span>(count &gt; <span class="number">0</span>)&#123;</span><br><span class="line">           <span class="keyword">return</span> Result.fail(<span class="string">&quot;用户已经购买过一次！&quot;</span>);</span><br><span class="line">       &#125;</span><br><span class="line">       </span><br><span class="line">       <span class="comment">// ………………其他代码</span></span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Transactional</span></span><br><span class="line"> <span class="keyword">public</span> <span class="keyword">synchronized</span> Result <span class="title function_">creatVoucherOrder</span><span class="params">(Long voucherId)</span> &#123;</span><br><span class="line">     <span class="comment">// 一人一单</span></span><br><span class="line">     <span class="comment">//查询订单</span></span><br><span class="line">     <span class="type">long</span> <span class="variable">userId</span> <span class="operator">=</span> UserHolder.getUser().getId();</span><br><span class="line">     <span class="type">Integer</span> <span class="variable">count</span> <span class="operator">=</span> query().eq(<span class="string">&quot;user_id&quot;</span>, userId).eq(<span class="string">&quot;voucher_id&quot;</span>, voucherId).count();</span><br><span class="line">     <span class="comment">//判断订单是否存在</span></span><br><span class="line">     <span class="keyword">if</span>(count &gt; <span class="number">0</span>)&#123;</span><br><span class="line">         <span class="keyword">return</span> Result.fail(<span class="string">&quot;用户已经购买过一次！&quot;</span>);</span><br><span class="line">     &#125;</span><br><span class="line"></span><br><span class="line">     <span class="comment">// ………………其他代码</span></span><br><span class="line"></span><br></pre></td></tr></table></figure>
 
 <ol>
 <li><p>如果多个用户同时调用这个方法，<strong>它们会被串行化</strong>。因为同一个实例对象的锁是全局共享的，所有线程都必须排队等候获取锁，无法并行执行，导致<strong>性能瓶颈</strong>。</p>
@@ -279,15 +279,161 @@
 </li>
 </ol>
 <p><strong>方法二：锁id以下的方法：（userId作为锁对象）</strong></p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Transactional</span></span><br><span class="line">    <span class="keyword">public</span> Result <span class="title function_">creatVoucherOrder</span><span class="params">(Long voucherId)</span> &#123;</span><br><span class="line">        <span class="comment">// 一人一单</span></span><br><span class="line">        <span class="comment">//查询订单</span></span><br><span class="line">        <span class="type">Long</span> <span class="variable">userId</span> <span class="operator">=</span> UserHolder.getUser().getId();</span><br><span class="line">        <span class="keyword">synchronized</span> (userId.toString()) &#123;</span><br><span class="line">            <span class="type">Integer</span> <span class="variable">count</span> <span class="operator">=</span> query().eq(<span class="string">&quot;user_id&quot;</span>, userId).eq(<span class="string">&quot;voucher_id&quot;</span>, voucherId).count();</span><br><span class="line">            <span class="comment">//判断订单是否存在</span></span><br><span class="line">            <span class="keyword">if</span> (count &gt; <span class="number">0</span>) &#123;</span><br><span class="line">                <span class="keyword">return</span> Result.fail(<span class="string">&quot;用户已经购买过一次！&quot;</span>);</span><br><span class="line">            &#125;</span><br><span class="line">            </span><br><span class="line">            <span class="comment">// ………………其他代码</span></span><br></pre></td></tr></table></figure>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Transactional</span></span><br><span class="line">    <span class="keyword">public</span> Result <span class="title function_">creatVoucherOrder</span><span class="params">(Long voucherId)</span> &#123;</span><br><span class="line">        <span class="comment">// 一人一单</span></span><br><span class="line">        <span class="comment">//查询订单</span></span><br><span class="line">        <span class="type">Long</span> <span class="variable">userId</span> <span class="operator">=</span> UserHolder.getUser().getId();</span><br><span class="line">        <span class="keyword">synchronized</span> (userId.toString().intern()) &#123;</span><br><span class="line">            <span class="comment">//intern():如果不使用intern，则每次调用都会返回新字符串对象</span></span><br><span class="line">            <span class="comment">//如果使用：会确保 userId.toString() 返回的字符串在 JVM 的字符串常量池中是唯一的</span></span><br><span class="line">            <span class="type">Integer</span> <span class="variable">count</span> <span class="operator">=</span> query().eq(<span class="string">&quot;user_id&quot;</span>, userId).eq(<span class="string">&quot;voucher_id&quot;</span>, voucherId).count();</span><br><span class="line">            <span class="comment">//判断订单是否存在</span></span><br><span class="line">            <span class="keyword">if</span> (count &gt; <span class="number">0</span>) &#123;</span><br><span class="line">                <span class="keyword">return</span> Result.fail(<span class="string">&quot;用户已经购买过一次！&quot;</span>);</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="comment">// ………………其他代码</span></span><br></pre></td></tr></table></figure>
 
 <ol>
-<li><p><strong>粒度更小</strong>：每个用户的操作有自己独立的锁，不同的用户之间互不干扰。这意味着多个用户可以并行执行方法，从而提高并发性能。</p>
+<li><strong>粒度更小</strong>：每个用户的操作有自己独立的锁，不同的用户之间互不干扰。这意味着多个用户可以并行执行方法，从而提高并发性能。</li>
+<li><strong>锁争用减少</strong>：不同用户请求的时候，它们锁定的 <code>userId</code> 不同，因此不会发生锁争用（除非不同用户的 <code>userId</code> 恰好相同，这种情况可以通过其他方式处理）。在这种情况下，线程并发性更好，效率更高。</li>
+</ol>
+</blockquote>
+<p><strong>但是！以上操作在集群环境中会出问题！</strong></p>
+<h2 id="优惠券秒杀-一人一单（集群版本）"><a href="#优惠券秒杀-一人一单（集群版本）" class="headerlink" title="优惠券秒杀-一人一单（集群版本）"></a>优惠券秒杀-一人一单（集群版本）</h2><h3 id="问题分析"><a href="#问题分析" class="headerlink" title="问题分析"></a>问题分析</h3><p>通过加锁可以解决在单机情况下的一人一单安全问题，但是在集群模式下就不行了。</p>
+<p>1、我们将服务启动两份，端口分别为8081和8082：</p>
+<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/1653373887844.png" alt="1653373887844"></p>
+<p>2、然后修改nginx的conf目录下的nginx.conf文件，配置反向代理和负载均衡：</p>
+<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/1653373908620.png" alt="1653373908620"></p>
+<p><strong>有关锁失效原因分析</strong></p>
+<h3 id="集群环境中的问题"><a href="#集群环境中的问题" class="headerlink" title="集群环境中的问题"></a>集群环境中的问题</h3><p>在集群环境中，情况就不同了。假设有多个Tomcat服务器分布在不同的物理机器上，每个服务器都有自己的JVM：</p>
+<p><strong>假设：</strong></p>
+<ul>
+<li><strong>服务器A</strong> 的Tomcat内部有 <strong>线程1</strong> 和 <strong>线程2</strong>，它们共享同一个锁对象。</li>
+<li><strong>服务器B</strong> 的Tomcat内部有 <strong>线程3</strong> 和 <strong>线程4</strong>，尽管它们的锁对象在代码上看起来是一样的，但由于它们运行在不同的JVM中，实际上并不是同一个对象。</li>
+</ul>
+<p>由于每个JVM都有自己的内存空间，服务器A的Tomcat中的锁对象和服务器B的Tomcat中的锁对象是不同的。这意味着：</p>
+<ul>
+<li><strong>线程1</strong> 和 <strong>线程2</strong> 可以通过锁对象实现互斥。</li>
+<li><strong>线程3</strong> 和 <strong>线程4</strong> 也可以通过它们的锁对象实现互斥。</li>
+<li>但是，<strong>线程1</strong> 和 <strong>线程2</strong> 无法与 <strong>线程3</strong> 和 <strong>线程4</strong> 实现互斥，因为它们在不同的JVM中，持有的是不同的锁对象。</li>
+</ul>
+<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/1653374044740.png" alt="1653374044740"></p>
+<p><strong>我们的目标：让多个JVM使用用一把锁！</strong></p>
+<h2 id="分布式锁"><a href="#分布式锁" class="headerlink" title="分布式锁"></a>分布式锁</h2><h3 id="分析一波"><a href="#分析一波" class="headerlink" title="分析一波"></a>分析一波</h3><p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241209194323567.png" alt="image-20241209194323567"></p>
+<p>如图，核心就是所有jvm中的所有线程都必须公用一个锁监视器</p>
+<p> <strong>分布式锁满足</strong>：</p>
+<ul>
+<li>多进程可见</li>
+<li>互斥</li>
+<li>高可用</li>
+<li>高性能</li>
+<li>安全性</li>
+</ul>
+<p><strong>实现分布式锁MySQL VS Redis：</strong></p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>MySQL</th>
+<th>Redis</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>互斥</td>
+<td>利用mysql本身的互斥锁机制</td>
+<td>利用<strong>setnx</strong>这样的互斥命令</td>
+</tr>
+<tr>
+<td>高可用</td>
+<td>好</td>
+<td>好</td>
+</tr>
+<tr>
+<td>高性能</td>
+<td>一般</td>
+<td>好</td>
+</tr>
+<tr>
+<td>安全性</td>
+<td>断开连接，自动释放锁</td>
+<td>利用锁超时时间，到期释放</td>
+</tr>
+</tbody></table>
+<h3 id="基于redis实现分布式锁"><a href="#基于redis实现分布式锁" class="headerlink" title="基于redis实现分布式锁"></a>基于redis实现分布式锁</h3><h4 id="分析一手"><a href="#分析一手" class="headerlink" title="分析一手"></a>分析一手</h4><p>使用SETNX来实现分布式锁：</p>
+<ul>
+<li><p>获取锁</p>
+<ul>
+<li><p>客户端尝试使用<code>SETNX</code>命令设置一个键（作为锁的标识），并附带一个唯一的标识符（如UUID），同时设置一个过期时间。</p>
 </li>
-<li><p><strong>锁争用减少</strong>：不同用户请求的时候，它们锁定的 <code>userId</code> 不同，因此不会发生锁争用（除非不同用户的 <code>userId</code> 恰好相同，这种情况可以通过其他方式处理）。在这种情况下，线程并发性更好，效率更高。</p>
+<li><p>如果该键不存在，<code>SETNX</code>会成功执行，返回1，表示锁获取成功。</p>
+</li>
+<li><p>如果该键已经存在，<code>SETNX</code>返回0，表示锁已被其他客户端持有。</p>
+</li>
+<li><p>为了避免死锁，通常会为锁设置一个<strong>过期时间。</strong></p>
+</li>
+</ul>
+</li>
+<li><p>释放锁</p>
+<ul>
+<li>DEL lock</li>
+</ul>
+</li>
+</ul>
+<img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241210102504172.png" alt="image-20241210102504172" style="zoom:50%;">
+
+<h4 id="简单的代码实现（1-0代码）："><a href="#简单的代码实现（1-0代码）：" class="headerlink" title="简单的代码实现（1.0代码）："></a>简单的代码实现（1.0代码）：</h4><p><strong>锁的接口：</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">interface</span> <span class="title class_">ILock</span> &#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 尝试获取锁</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> timeoutSec 锁持有的超时时间，过期后自动释放</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> true代表获取锁成功，false代表获取锁失败</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="type">boolean</span> <span class="title function_">tryLock</span><span class="params">(Long timeoutSec)</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 释放锁</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">void</span> <span class="title function_">unlock</span><span class="params">()</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<p><strong>锁的实现类：</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> com.hmdp.utils;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.data.redis.core.RedisTemplate;</span><br><span class="line"><span class="keyword">import</span> org.springframework.data.redis.core.StringRedisTemplate;</span><br><span class="line"><span class="keyword">import</span> org.springframework.stereotype.Component;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> java.util.concurrent.TimeUnit;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">SimpleRedisLock</span> <span class="keyword">implements</span> <span class="title class_">ILock</span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> StringRedisTemplate stringRedisTemplate;</span><br><span class="line">    <span class="keyword">private</span> String name;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="title function_">SimpleRedisLock</span><span class="params">(StringRedisTemplate stringRedisTemplate, String name)</span> &#123;</span><br><span class="line">        <span class="built_in">this</span>.stringRedisTemplate = stringRedisTemplate;</span><br><span class="line">        <span class="built_in">this</span>.name = name;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">String</span> <span class="variable">KEY_PREFFIX</span> <span class="operator">=</span> <span class="string">&quot;lock:&quot;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="type">boolean</span> <span class="title function_">tryLock</span><span class="params">(Long timeoutSec)</span> &#123;</span><br><span class="line">        <span class="comment">//设置key</span></span><br><span class="line">        <span class="type">String</span> <span class="variable">key</span> <span class="operator">=</span> KEY_PREFFIX + name;</span><br><span class="line">        <span class="comment">//设置value：将value设置成当前线程或客户端表示的唯一值，原因见下文</span></span><br><span class="line">        <span class="type">long</span> <span class="variable">threadId</span> <span class="operator">=</span> Thread.currentThread().getId();</span><br><span class="line">        <span class="comment">//获取锁：</span></span><br><span class="line">        <span class="type">Boolean</span> <span class="variable">success</span> <span class="operator">=</span> stringRedisTemplate.opsForValue().setIfAbsent(key, threadId + <span class="string">&quot;&quot;</span>, timeoutSec, TimeUnit.SECONDS);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> Boolean.TRUE.equals(success);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">unlock</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="comment">//释放锁</span></span><br><span class="line">        stringRedisTemplate.delete(KEY_PREFFIX + name);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+
+
+<blockquote>
+<p><strong>将redis的value设置成当前线程或客户端的唯一标识的原因：</strong></p>
+<ol>
+<li><p>如果 Redis 锁的值仅仅是一个固定的标识符（例如 <code>1</code> 或 <code>lock</code>），那么所有客户端都可以获取该锁，并且有可能在不同的客户端之间发生锁误释放的情况。这意味着，一个客户端可能会在另一个客户端的操作完成之前，错误地释放该锁，从而导致并发冲突。</p>
+<p><strong>解决方法</strong>：通过将锁的 <strong>value</strong> 设置为当前线程或客户端的唯一标识（例如，线程 ID、UUID 或某种唯一字符串），可以确保锁的拥有者在释放锁时验证该值。只有当锁的 <strong>value</strong> 与当前客户端的标识一致时，才能释放锁。</p>
+</li>
+<li><p>如果没有线程标识，<strong>其他客户端可能会在锁过期后错误地释放锁</strong>，因为它们无法区分自己是否是正确的锁拥有者。通过将锁的值设置为客户端的唯一标识符，可以在释放锁时做有效的检查，确保锁的释放操作是安全的。</p>
+<p>例如，在释放锁时，客户端会检查 Redis 中的值是否与自己的标识符相同。如果相同，则可以释放锁；如果不同，则说明锁已经被其他客户端持有，当前客户端不应该释放锁。</p>
 </li>
 </ol>
 </blockquote>
+<p>然后我们之前加锁位置的代码如下：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">synchronized</span> (userId.toString().intern()) &#123;</span><br><span class="line">            <span class="type">IVoucherOrderService</span> <span class="variable">proxy</span> <span class="operator">=</span> </span><br><span class="line">            	(IVoucherOrderService) AopContext.currentProxy();</span><br><span class="line">            <span class="keyword">return</span> proxy.creatVoucherOrder(voucherId);</span><br><span class="line">        &#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>将普通的锁修改成分布式锁：</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//获取锁对象</span></span><br><span class="line">        <span class="type">SimpleRedisLock</span> <span class="variable">lock</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">SimpleRedisLock</span>(stringRedisTemplate, <span class="string">&quot;order:&quot;</span> + userId);</span><br><span class="line">        <span class="comment">//获取锁</span></span><br><span class="line">        <span class="type">boolean</span> <span class="variable">isLock</span> <span class="operator">=</span> lock.tryLock(<span class="number">1200L</span>);</span><br><span class="line">        <span class="comment">//判断是否获取锁成功</span></span><br><span class="line">        <span class="keyword">if</span> (!isLock) &#123;</span><br><span class="line">            <span class="comment">//不成功，返回错误信息</span></span><br><span class="line">            <span class="keyword">return</span> Result.fail(<span class="string">&quot;每人只允许下一单&quot;</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            <span class="type">IVoucherOrderService</span> <span class="variable">proxy</span> <span class="operator">=</span> (IVoucherOrderService) AopContext.currentProxy();</span><br><span class="line">            <span class="keyword">return</span> proxy.creatVoucherOrder(voucherId);</span><br><span class="line">        &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">            lock.unlock();</span><br><span class="line">        &#125;</span><br></pre></td></tr></table></figure>
+
+<p>但是存在误删现象！</p>
+<h4 id="Redis分布式锁误删情况分析"><a href="#Redis分布式锁误删情况分析" class="headerlink" title="Redis分布式锁误删情况分析"></a>Redis分布式锁误删情况分析</h4><ul>
+<li><strong>线程1</strong> 获取了 Redis 分布式锁（假设 key 为锁的标识符，value 为线程1的唯一标识，比如线程 ID），并开始执行其业务逻辑。</li>
+<li>锁有一个自动过期时间（例如 5 秒）</li>
+<li><strong>线程1</strong> 因业务阻塞或业务逻辑时间较长，超过了锁的过期时间。</li>
+<li>锁到期后，Redis 自动释放了锁。</li>
+<li><strong>线程2</strong> 获取到了相同的锁，并开始执行自己的业务逻辑。</li>
+<li><strong>线程1</strong> 完成了业务逻辑，尝试释放锁时发现锁依然存在（因为线程2重新加锁了），此时会误删除线程2的锁。</li>
+</ul>
+<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241210154244175.png" alt="image-20241210154244175"></p>
+<h4 id="解决方法（2-0代码）"><a href="#解决方法（2-0代码）" class="headerlink" title="解决方法（2.0代码）"></a>解决方法（2.0代码）</h4><p>当一个线程获取锁时，锁的 <code>value</code> 被设置为该线程的唯一标识（例如<strong>线程 ID</strong> 或 <strong>UUID</strong>）。</p>
+<p>所以释放锁时，先检查锁的 <code>value</code> 是否为当前线程的唯一标识，只有匹配时才可以释放锁。</p>
+<img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241210154550226.png" alt="image-20241210154550226" style="zoom:50%;">
+
+<p>在 <strong>分布式环境</strong> 中，每个应用实例或进程可能都运行在不同的机器上，且每个机器上的线程 ID 互相独立，在不同的 JVM 实例或服务器上无法保证唯一性</p>
+<p>我们使用<strong>UUID+线程ID</strong>的方法</p>
+<p>UUID：核实是否是同一JVM</p>
+<p>线程ID：核实是否是同一JVM中的线程</p>
+<p>代码如下：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> com.hmdp.utils;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> cn.hutool.core.lang.UUID;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.data.redis.core.RedisTemplate;</span><br><span class="line"><span class="keyword">import</span> org.springframework.data.redis.core.StringRedisTemplate;</span><br><span class="line"><span class="keyword">import</span> org.springframework.stereotype.Component;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> java.util.concurrent.TimeUnit;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">SimpleRedisLock</span> <span class="keyword">implements</span> <span class="title class_">ILock</span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> StringRedisTemplate stringRedisTemplate;</span><br><span class="line">    <span class="keyword">private</span> String name;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="title function_">SimpleRedisLock</span><span class="params">(StringRedisTemplate stringRedisTemplate, String name)</span> &#123;</span><br><span class="line">        <span class="built_in">this</span>.stringRedisTemplate = stringRedisTemplate;</span><br><span class="line">        <span class="built_in">this</span>.name = name;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">String</span> <span class="variable">KEY_PREFFIX</span> <span class="operator">=</span> <span class="string">&quot;lock:&quot;</span>;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">String</span> <span class="variable">ID_PREFIX</span> <span class="operator">=</span> UUID.randomUUID().toString(<span class="literal">true</span>) + <span class="string">&quot;-&quot;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="type">boolean</span> <span class="title function_">tryLock</span><span class="params">(Long timeoutSec)</span> &#123;</span><br><span class="line">        <span class="comment">//设置key</span></span><br><span class="line">        <span class="type">String</span> <span class="variable">key</span> <span class="operator">=</span> KEY_PREFFIX + name;</span><br><span class="line">        <span class="comment">//设置value：将value设置成当前线程或客户端表示的唯一值，原因见下文</span></span><br><span class="line">        <span class="type">long</span> <span class="variable">threadId</span> <span class="operator">=</span> Thread.currentThread().getId();</span><br><span class="line">        <span class="comment">//获取锁：</span></span><br><span class="line">        <span class="type">Boolean</span> <span class="variable">success</span> <span class="operator">=</span> stringRedisTemplate.opsForValue().setIfAbsent(key, ID_PREFIX + threadId, timeoutSec, TimeUnit.SECONDS);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> Boolean.TRUE.equals(success);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">unlock</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="comment">//获取线程标识</span></span><br><span class="line">        <span class="type">String</span> <span class="variable">threadId</span> <span class="operator">=</span> KEY_PREFFIX + Thread.currentThread().getId();</span><br><span class="line">        <span class="comment">// 获取锁中标识</span></span><br><span class="line">        <span class="type">String</span> <span class="variable">id</span> <span class="operator">=</span> stringRedisTemplate.opsForValue().get(KEY_PREFFIX + name);</span><br><span class="line">        <span class="comment">//判断指示是否一致</span></span><br><span class="line">        <span class="keyword">if</span>(threadId.equals(id))&#123;</span><br><span class="line">            <span class="comment">//释放锁</span></span><br><span class="line">            stringRedisTemplate.delete(KEY_PREFFIX + name);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<h3 id="还是出现了问题！分布式锁原子性的问题"><a href="#还是出现了问题！分布式锁原子性的问题" class="headerlink" title="还是出现了问题！分布式锁原子性的问题"></a>还是出现了问题！分布式锁原子性的问题</h3><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241210162809652.png" alt="image-20241210162809652" style="zoom:80%;">
+
+<p><strong>问题场景</strong></p>
+<ul>
+<li>在线程1执行释放锁的过程中，已经核实了value值，还没来得及释放锁，锁的超时时间已到，Redis 自动将锁删除。</li>
+<li>此时，线程2尝试获取锁并成功，因为 Redis 已经将超时的锁释放了。</li>
+<li>线程2成功获取锁后，执行业务逻辑。</li>
+<li>线程1在恢复执行后，继续删除锁（因为已经核实过了value，所以有删除的权限）。此时删除的实际上是线程2的锁。</li>
+</ul>
+<p><strong>问题根源</strong></p>
+<ul>
+<li>线程1的检查锁标识、判断锁一致性和删除锁的过程并非原子性。<ul>
+<li>Redis 的锁在业务逻辑过程中可能会因为超时时间到而自动释放。</li>
+<li>线程2可以在锁超时后成功获取锁，而线程1继续执行删除锁操作，从而错误地释放线程2的锁。</li>
+</ul>
+</li>
+</ul>
 
       
 
