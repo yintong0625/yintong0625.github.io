@@ -6,17 +6,32 @@
   <meta name="renderer" content="webkit">
   <meta http-equiv="X-UA-Compatible" content="IE=edge" >
   <link rel="dns-prefetch" href="http://example.com">
-  <title>Archives | Yintong&#39;s Blog</title>
+  <title>Redis实现分布式锁 | Yintong&#39;s Blog</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description" content="今天是上天的恩赐">
-<meta property="og:type" content="website">
-<meta property="og:title" content="Yintong&#39;s Blog">
-<meta property="og:url" content="http://example.com/archives/index.html">
+  <meta name="description" content="分布式锁分析一波 如图，核心就是所有jvm中的所有线程都必须公用一个锁监视器  分布式锁满足：  多进程可见 互斥 高可用 高性能 安全性  实现分布式锁MySQL VS Redis：     MySQL Redis    互斥 利用mysql本身的互斥锁机制 利用setnx这样的互斥命令   高可用 好 好   高性能 一般 好   安全性 断开连接，自动释放锁 利用锁超时时间，到期释放   基">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis实现分布式锁">
+<meta property="og:url" content="http://example.com/2024/12/12/Redis%E5%AE%9E%E7%8E%B0%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81/index.html">
 <meta property="og:site_name" content="Yintong&#39;s Blog">
-<meta property="og:description" content="今天是上天的恩赐">
+<meta property="og:description" content="分布式锁分析一波 如图，核心就是所有jvm中的所有线程都必须公用一个锁监视器  分布式锁满足：  多进程可见 互斥 高可用 高性能 安全性  实现分布式锁MySQL VS Redis：     MySQL Redis    互斥 利用mysql本身的互斥锁机制 利用setnx这样的互斥命令   高可用 好 好   高性能 一般 好   安全性 断开连接，自动释放锁 利用锁超时时间，到期释放   基">
 <meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241209194323567.png">
+<meta property="og:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241210102504172.png">
+<meta property="og:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241210154244175.png">
+<meta property="og:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241210154550226.png">
+<meta property="og:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241210162809652.png">
+<meta property="og:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/1653392181413.png">
+<meta property="og:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/1653392218531.png">
+<meta property="og:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/1653392438917.png">
+<meta property="og:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241213091115969.png">
+<meta property="og:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241213090825515.png">
+<meta property="og:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241213094620409.png">
+<meta property="article:published_time" content="2024-12-12T11:16:07.000Z">
+<meta property="article:modified_time" content="2024-12-13T06:25:11.967Z">
 <meta property="article:author" content="Yintong">
+<meta property="article:tag" content="后端">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241209194323567.png">
   
     <link rel="alternative" href="/atom.xml" title="Yintong&#39;s Blog" type="application/atom+xml">
   
@@ -154,36 +169,243 @@
             <canvas data-colors="#eaeaea" data-sectionHeight="100" data-contentId="js-content" id="myCanvas1" class="anm-canvas"></canvas>
           </div>
           <div id="js-content" class="content-ll">
-            
+            <article id="post-Redis实现分布式锁" class="article article-type-post " itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
   
+    <h1 class="article-title" itemprop="name">
+      Redis实现分布式锁
+    </h1>
   
-    
-    
-      
-      
-      <section class="archives-wrap">
-        <div class="archive-year-wrap">
-          <a href="/archives/2024" class="archive-year">2024</a>
-        </div>
-        <div class="archives">
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2024/12/12/Redis%E5%AE%9E%E7%8E%B0%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81/" class="archive-article-date">
+
+        
+        <a href="/2024/12/12/Redis%E5%AE%9E%E7%8E%B0%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81/" class="archive-article-date">
   	<time datetime="2024-12-12T11:16:07.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-12-12</time>
 </a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2024/12/12/Redis%E5%AE%9E%E7%8E%B0%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81/">Redis实现分布式锁</a>
-    </h1>
-  
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="分布式锁"><a href="#分布式锁" class="headerlink" title="分布式锁"></a>分布式锁</h2><h3 id="分析一波"><a href="#分析一波" class="headerlink" title="分析一波"></a>分析一波</h3><p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241209194323567.png" alt="image-20241209194323567"></p>
+<p>如图，核心就是所有jvm中的所有线程都必须公用一个锁监视器</p>
+<p> <strong>分布式锁满足</strong>：</p>
+<ul>
+<li>多进程可见</li>
+<li>互斥</li>
+<li>高可用</li>
+<li>高性能</li>
+<li>安全性</li>
+</ul>
+<p><strong>实现分布式锁MySQL VS Redis：</strong></p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>MySQL</th>
+<th>Redis</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>互斥</td>
+<td>利用mysql本身的互斥锁机制</td>
+<td>利用<strong>setnx</strong>这样的互斥命令</td>
+</tr>
+<tr>
+<td>高可用</td>
+<td>好</td>
+<td>好</td>
+</tr>
+<tr>
+<td>高性能</td>
+<td>一般</td>
+<td>好</td>
+</tr>
+<tr>
+<td>安全性</td>
+<td>断开连接，自动释放锁</td>
+<td>利用锁超时时间，到期释放</td>
+</tr>
+</tbody></table>
+<h3 id="基于redis实现分布式锁"><a href="#基于redis实现分布式锁" class="headerlink" title="基于redis实现分布式锁"></a>基于redis实现分布式锁</h3><h4 id="分析一手"><a href="#分析一手" class="headerlink" title="分析一手"></a>分析一手</h4><p>使用SETNX来实现分布式锁：</p>
+<ul>
+<li><p>获取锁</p>
+<ul>
+<li><p>客户端尝试使用<code>SETNX</code>命令设置一个键（作为锁的标识），并附带一个唯一的标识符（如UUID），同时设置一个过期时间。</p>
+</li>
+<li><p>如果该键不存在，<code>SETNX</code>会成功执行，返回1，表示锁获取成功。</p>
+</li>
+<li><p>如果该键已经存在，<code>SETNX</code>返回0，表示锁已被其他客户端持有。</p>
+</li>
+<li><p>为了避免死锁，通常会为锁设置一个<strong>过期时间。</strong></p>
+</li>
+</ul>
+</li>
+<li><p>释放锁</p>
+<ul>
+<li>DEL lock</li>
+</ul>
+</li>
+</ul>
+<img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241210102504172.png" alt="image-20241210102504172" style="zoom:50%;">
 
-        <div class="article-info info-on-right">
-          
+<h4 id="简单的代码实现（1-0代码）："><a href="#简单的代码实现（1-0代码）：" class="headerlink" title="简单的代码实现（1.0代码）："></a>简单的代码实现（1.0代码）：</h4><p><strong>锁的接口：</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">interface</span> <span class="title class_">ILock</span> &#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 尝试获取锁</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> timeoutSec 锁持有的超时时间，过期后自动释放</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> true代表获取锁成功，false代表获取锁失败</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="type">boolean</span> <span class="title function_">tryLock</span><span class="params">(Long timeoutSec)</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 释放锁</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">void</span> <span class="title function_">unlock</span><span class="params">()</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<p><strong>锁的实现类：</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> com.hmdp.utils;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.data.redis.core.RedisTemplate;</span><br><span class="line"><span class="keyword">import</span> org.springframework.data.redis.core.StringRedisTemplate;</span><br><span class="line"><span class="keyword">import</span> org.springframework.stereotype.Component;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> java.util.concurrent.TimeUnit;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">SimpleRedisLock</span> <span class="keyword">implements</span> <span class="title class_">ILock</span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> StringRedisTemplate stringRedisTemplate;</span><br><span class="line">    <span class="keyword">private</span> String name;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="title function_">SimpleRedisLock</span><span class="params">(StringRedisTemplate stringRedisTemplate, String name)</span> &#123;</span><br><span class="line">        <span class="built_in">this</span>.stringRedisTemplate = stringRedisTemplate;</span><br><span class="line">        <span class="built_in">this</span>.name = name;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">String</span> <span class="variable">KEY_PREFFIX</span> <span class="operator">=</span> <span class="string">&quot;lock:&quot;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="type">boolean</span> <span class="title function_">tryLock</span><span class="params">(Long timeoutSec)</span> &#123;</span><br><span class="line">        <span class="comment">//设置key</span></span><br><span class="line">        <span class="type">String</span> <span class="variable">key</span> <span class="operator">=</span> KEY_PREFFIX + name;</span><br><span class="line">        <span class="comment">//设置value：将value设置成当前线程或客户端表示的唯一值，原因见下文</span></span><br><span class="line">        <span class="type">long</span> <span class="variable">threadId</span> <span class="operator">=</span> Thread.currentThread().getId();</span><br><span class="line">        <span class="comment">//获取锁：</span></span><br><span class="line">        <span class="type">Boolean</span> <span class="variable">success</span> <span class="operator">=</span> stringRedisTemplate.opsForValue().setIfAbsent(key, threadId + <span class="string">&quot;&quot;</span>, timeoutSec, TimeUnit.SECONDS);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> Boolean.TRUE.equals(success);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">unlock</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="comment">//释放锁</span></span><br><span class="line">        stringRedisTemplate.delete(KEY_PREFFIX + name);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+
+
+<blockquote>
+<p><strong>将redis的value设置成当前线程或客户端的唯一标识的原因：</strong></p>
+<ol>
+<li><p>如果 Redis 锁的值仅仅是一个固定的标识符（例如 <code>1</code> 或 <code>lock</code>），那么所有客户端都可以获取该锁，并且有可能在不同的客户端之间发生锁误释放的情况。这意味着，一个客户端可能会在另一个客户端的操作完成之前，错误地释放该锁，从而导致并发冲突。</p>
+<p><strong>解决方法</strong>：通过将锁的 <strong>value</strong> 设置为当前线程或客户端的唯一标识（例如，线程 ID、UUID 或某种唯一字符串），可以确保锁的拥有者在释放锁时验证该值。只有当锁的 <strong>value</strong> 与当前客户端的标识一致时，才能释放锁。</p>
+</li>
+<li><p>如果没有线程标识，<strong>其他客户端可能会在锁过期后错误地释放锁</strong>，因为它们无法区分自己是否是正确的锁拥有者。通过将锁的值设置为客户端的唯一标识符，可以在释放锁时做有效的检查，确保锁的释放操作是安全的。</p>
+<p>例如，在释放锁时，客户端会检查 Redis 中的值是否与自己的标识符相同。如果相同，则可以释放锁；如果不同，则说明锁已经被其他客户端持有，当前客户端不应该释放锁。</p>
+</li>
+</ol>
+</blockquote>
+<p>然后我们之前加锁位置的代码如下：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">synchronized</span> (userId.toString().intern()) &#123;</span><br><span class="line">            <span class="type">IVoucherOrderService</span> <span class="variable">proxy</span> <span class="operator">=</span> </span><br><span class="line">            	(IVoucherOrderService) AopContext.currentProxy();</span><br><span class="line">            <span class="keyword">return</span> proxy.creatVoucherOrder(voucherId);</span><br><span class="line">        &#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>将普通的锁修改成分布式锁：</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//获取锁对象</span></span><br><span class="line">        <span class="type">SimpleRedisLock</span> <span class="variable">lock</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">SimpleRedisLock</span>(stringRedisTemplate, <span class="string">&quot;order:&quot;</span> + userId);</span><br><span class="line">        <span class="comment">//获取锁</span></span><br><span class="line">        <span class="type">boolean</span> <span class="variable">isLock</span> <span class="operator">=</span> lock.tryLock(<span class="number">1200L</span>);</span><br><span class="line">        <span class="comment">//判断是否获取锁成功</span></span><br><span class="line">        <span class="keyword">if</span> (!isLock) &#123;</span><br><span class="line">            <span class="comment">//不成功，返回错误信息</span></span><br><span class="line">            <span class="keyword">return</span> Result.fail(<span class="string">&quot;每人只允许下一单&quot;</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            <span class="type">IVoucherOrderService</span> <span class="variable">proxy</span> <span class="operator">=</span> (IVoucherOrderService) AopContext.currentProxy();</span><br><span class="line">            <span class="keyword">return</span> proxy.creatVoucherOrder(voucherId);</span><br><span class="line">        &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">            lock.unlock();</span><br><span class="line">        &#125;</span><br></pre></td></tr></table></figure>
+
+<p>但是存在误删现象！</p>
+<h4 id="Redis分布式锁误删情况分析"><a href="#Redis分布式锁误删情况分析" class="headerlink" title="Redis分布式锁误删情况分析"></a>Redis分布式锁误删情况分析</h4><ul>
+<li><strong>线程1</strong> 获取了 Redis 分布式锁（假设 key 为锁的标识符，value 为线程1的唯一标识，比如线程 ID），并开始执行其业务逻辑。</li>
+<li>锁有一个自动过期时间（例如 5 秒）</li>
+<li><strong>线程1</strong> 因业务阻塞或业务逻辑时间较长，超过了锁的过期时间。</li>
+<li>锁到期后，Redis 自动释放了锁。</li>
+<li><strong>线程2</strong> 获取到了相同的锁，并开始执行自己的业务逻辑。</li>
+<li><strong>线程1</strong> 完成了业务逻辑，尝试释放锁时发现锁依然存在（因为线程2重新加锁了），此时会误删除线程2的锁。</li>
+</ul>
+<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241210154244175.png" alt="image-20241210154244175"></p>
+<h4 id="解决方法（2-0代码）"><a href="#解决方法（2-0代码）" class="headerlink" title="解决方法（2.0代码）"></a>解决方法（2.0代码）</h4><p>当一个线程获取锁时，锁的 <code>value</code> 被设置为该线程的唯一标识（例如<strong>线程 ID</strong> 或 <strong>UUID</strong>）。</p>
+<p>所以释放锁时，先检查锁的 <code>value</code> 是否为当前线程的唯一标识，只有匹配时才可以释放锁。</p>
+<img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241210154550226.png" alt="image-20241210154550226" style="zoom:50%;">
+
+<p>在 <strong>分布式环境</strong> 中，每个应用实例或进程可能都运行在不同的机器上，且每个机器上的线程 ID 互相独立，在不同的 JVM 实例或服务器上无法保证唯一性</p>
+<p>我们使用<strong>UUID+线程ID</strong>的方法</p>
+<p>UUID：核实是否是同一JVM</p>
+<p>线程ID：核实是否是同一JVM中的线程</p>
+<p>代码如下：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> com.hmdp.utils;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> cn.hutool.core.lang.UUID;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.data.redis.core.RedisTemplate;</span><br><span class="line"><span class="keyword">import</span> org.springframework.data.redis.core.StringRedisTemplate;</span><br><span class="line"><span class="keyword">import</span> org.springframework.stereotype.Component;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> java.util.concurrent.TimeUnit;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">SimpleRedisLock</span> <span class="keyword">implements</span> <span class="title class_">ILock</span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> StringRedisTemplate stringRedisTemplate;</span><br><span class="line">    <span class="keyword">private</span> String name;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="title function_">SimpleRedisLock</span><span class="params">(StringRedisTemplate stringRedisTemplate, String name)</span> &#123;</span><br><span class="line">        <span class="built_in">this</span>.stringRedisTemplate = stringRedisTemplate;</span><br><span class="line">        <span class="built_in">this</span>.name = name;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">String</span> <span class="variable">KEY_PREFFIX</span> <span class="operator">=</span> <span class="string">&quot;lock:&quot;</span>;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">String</span> <span class="variable">ID_PREFIX</span> <span class="operator">=</span> UUID.randomUUID().toString(<span class="literal">true</span>) + <span class="string">&quot;-&quot;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="type">boolean</span> <span class="title function_">tryLock</span><span class="params">(Long timeoutSec)</span> &#123;</span><br><span class="line">        <span class="comment">//设置key</span></span><br><span class="line">        <span class="type">String</span> <span class="variable">key</span> <span class="operator">=</span> KEY_PREFFIX + name;</span><br><span class="line">        <span class="comment">//设置value：将value设置成当前线程或客户端表示的唯一值，原因见下文</span></span><br><span class="line">        <span class="type">long</span> <span class="variable">threadId</span> <span class="operator">=</span> Thread.currentThread().getId();</span><br><span class="line">        <span class="comment">//获取锁：</span></span><br><span class="line">        <span class="type">Boolean</span> <span class="variable">success</span> <span class="operator">=</span> stringRedisTemplate.opsForValue().setIfAbsent(key, ID_PREFIX + threadId, timeoutSec, TimeUnit.SECONDS);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> Boolean.TRUE.equals(success);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">unlock</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="comment">//获取线程标识</span></span><br><span class="line">        <span class="type">String</span> <span class="variable">threadId</span> <span class="operator">=</span> KEY_PREFFIX + Thread.currentThread().getId();</span><br><span class="line">        <span class="comment">// 获取锁中标识</span></span><br><span class="line">        <span class="type">String</span> <span class="variable">id</span> <span class="operator">=</span> stringRedisTemplate.opsForValue().get(KEY_PREFFIX + name);</span><br><span class="line">        <span class="comment">//判断指示是否一致</span></span><br><span class="line">        <span class="keyword">if</span>(threadId.equals(id))&#123;</span><br><span class="line">            <span class="comment">//释放锁</span></span><br><span class="line">            stringRedisTemplate.delete(KEY_PREFFIX + name);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<h3 id="还是出现了问题！分布式锁原子性的问题"><a href="#还是出现了问题！分布式锁原子性的问题" class="headerlink" title="还是出现了问题！分布式锁原子性的问题"></a>还是出现了问题！分布式锁原子性的问题</h3><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241210162809652.png" alt="image-20241210162809652" style="zoom:80%;">
+
+<p><strong>问题场景</strong></p>
+<ul>
+<li>在线程1执行释放锁的过程中，<strong>已经核实了value值，还没来得及释放锁</strong>，锁的超时时间已到，Redis 自动将锁删除。</li>
+<li>此时，线程2尝试获取锁并成功，因为 Redis 已经将超时的锁释放了。</li>
+<li>线程2成功获取锁后，执行业务逻辑。</li>
+<li>线程1在恢复执行后，继续删除锁（因为已经核实过了value，所以有删除的权限）。此时删除的实际上是线程2的锁。</li>
+</ul>
+<p><strong>问题根源</strong></p>
+<ul>
+<li>线程1的检查锁标识、判断锁一致性和删除锁的<strong>过程并非原子性</strong>。<ul>
+<li>Redis 的锁在业务逻辑过程中可能会因为超时时间到而自动释放。</li>
+<li>线程2可以在锁超时后成功获取锁，而线程1继续执行删除锁操作，从而错误地释放线程2的锁。</li>
+</ul>
+</li>
+</ul>
+<h2 id="Lua脚本解决多条命令原子性问题"><a href="#Lua脚本解决多条命令原子性问题" class="headerlink" title="Lua脚本解决多条命令原子性问题"></a>Lua脚本解决多条命令原子性问题</h2><h3 id="lua用法简介"><a href="#lua用法简介" class="headerlink" title="lua用法简介"></a>lua用法简介</h3><p><strong>Redis 事务能保证原子性，但不能保证一致性</strong>。这是因为 Redis 提供了基本的原子性保证，但在事务执行的过程中，并不会对数据进行一致性检查，也不支持回滚或隔离等复杂的事务特性。因此，虽然 Redis 保证了事务的原子性，但由于缺乏其他事务特性，它无法保证一致性。</p>
+<p>所以我们使用<strong>Lua脚本</strong>来解决原子性问题</p>
+<p>Redis提供了Lua脚本功能，在一个脚本中编写多条Redis命令，确保多条命令执行时的原子性</p>
+<p>基本语法：<a target="_blank" rel="noopener" href="https://www.runoob.com/lua/lua-tutorial.html%EF%BC%8C">https://www.runoob.com/lua/lua-tutorial.html，</a></p>
+<p>这里重点介绍Redis提供的调用函数，语法如下：</p>
+<figure class="highlight lua"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">redis.call(<span class="string">&#x27;命令名称&#x27;</span>, <span class="string">&#x27;key&#x27;</span>, <span class="string">&#x27;其它参数&#x27;</span>, ...)</span><br></pre></td></tr></table></figure>
+
+<p>例如，我们要执行set name jack，则脚本是这样：</p>
+<figure class="highlight lua"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"># 执行 set name jack</span><br><span class="line">redis.call(<span class="string">&#x27;set&#x27;</span>, <span class="string">&#x27;name&#x27;</span>, <span class="string">&#x27;jack&#x27;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>例如，我们要先执行set name Rose，再执行get name，则脚本如下：</p>
+<figure class="highlight lua"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"># 先执行 set name jack</span><br><span class="line">redis.call(<span class="string">&#x27;set&#x27;</span>, <span class="string">&#x27;name&#x27;</span>, <span class="string">&#x27;Rose&#x27;</span>)</span><br><span class="line"># 再执行 get name</span><br><span class="line"><span class="keyword">local</span> name = redis.call(<span class="string">&#x27;get&#x27;</span>, <span class="string">&#x27;name&#x27;</span>)</span><br><span class="line"># 返回</span><br><span class="line"><span class="keyword">return</span> name</span><br></pre></td></tr></table></figure>
+
+<p>写好脚本以后，需要用Redis命令来调用脚本，调用脚本的常见命令如下：</p>
+<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/1653392181413.png" alt="1653392181413"></p>
+<p>例如，我们要执行 redis.call(‘set’, ‘name’, ‘jack’) 这个脚本，语法如下：</p>
+<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/1653392218531.png" alt="1653392218531"></p>
+<p>如果脚本中的key、value不想写死，可以作为参数传递。key类型参数会放入KEYS数组，其它参数会放入ARGV数组，在脚本中可以从KEYS和ARGV数组获取这些参数：</p>
+<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/1653392438917.png" alt="1653392438917"></p>
+<p>测试一下：</p>
+<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241213091115969.png" alt="image-20241213091115969"></p>
+<p>接下来我们来回一下我们释放锁的逻辑：</p>
+<h3 id="解决业务的lua代码"><a href="#解决业务的lua代码" class="headerlink" title="解决业务的lua代码"></a>解决业务的lua代码</h3><p>释放锁的业务流程是这样的</p>
+<p>​	1、获取锁中的线程标示</p>
+<p>​	2、判断是否与指定的标示（当前线程标示）一致</p>
+<p>​	3、如果一致则释放锁（删除）</p>
+<p>​	4、如果不一致则什么都不做</p>
+<p>如果用Lua脚本来表示则是这样的：</p>
+<p>最终我们操作redis的拿锁比锁删锁的lua脚本就会变成这样</p>
+<figure class="highlight lua"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">--锁的key</span></span><br><span class="line"><span class="keyword">local</span> key = KEYS[<span class="number">1</span>]</span><br><span class="line"><span class="comment">--当前线程标识</span></span><br><span class="line"><span class="keyword">local</span> threadId = ARGV[<span class="number">1</span>]</span><br><span class="line"></span><br><span class="line"><span class="comment">--从redis中获取线程标识 get key</span></span><br><span class="line"><span class="keyword">local</span> id = redis.call(<span class="string">&#x27;get&#x27;</span>, key)</span><br><span class="line"><span class="comment">--验证是否一样</span></span><br><span class="line"><span class="keyword">if</span>(id == threadId)<span class="keyword">then</span></span><br><span class="line">    <span class="comment">--一样就释放锁 del key</span></span><br><span class="line">    redis.call(<span class="string">&#x27;del&#x27;</span>, key)</span><br><span class="line"><span class="keyword">end</span></span><br><span class="line"><span class="keyword">return</span> <span class="number">0</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="java调用Lua脚本改造分布式锁"><a href="#java调用Lua脚本改造分布式锁" class="headerlink" title="java调用Lua脚本改造分布式锁"></a>java调用Lua脚本改造分布式锁</h3><p>先简单看看使用方法👇</p>
+<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241213090825515.png" alt="image-20241213090825515"></p>
+<p>开始操作！</p>
+<ol>
+<li><p>先搞个Lua文件</p>
+<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/image-20241213094620409.png" alt="image-20241213094620409"></p>
+</li>
+<li><p>java代码：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> DefaultRedisScript&lt;Long&gt; UNLOCK_SCRIPT;</span><br><span class="line">    <span class="keyword">static</span> &#123;<span class="comment">//静态代码块，在加载类的时候直接定义UNLOCK_SCRIPT</span></span><br><span class="line">        UNLOCK_SCRIPT = <span class="keyword">new</span> <span class="title class_">DefaultRedisScript</span>&lt;&gt;();</span><br><span class="line">        UNLOCK_SCRIPT.setLocation(<span class="keyword">new</span> <span class="title class_">ClassPathResource</span>(<span class="string">&quot;unlock.lua&quot;</span>));</span><br><span class="line">        UNLOCK_SCRIPT.setResultType(Long.class);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">unlock</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="comment">// 调用lua脚本</span></span><br><span class="line">    stringRedisTemplate.execute(</span><br><span class="line">            UNLOCK_SCRIPT,</span><br><span class="line">            Collections.singletonList(KEY_PREFIX + name),</span><br><span class="line">            ID_PREFIX + Thread.currentThread().getId());</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在更改之后，unlock方法中就是一行代码了，就没有原子性的问题了</p>
+</li>
+</ol>
+<h2 id="仍然存在的问题"><a href="#仍然存在的问题" class="headerlink" title="仍然存在的问题"></a>仍然存在的问题</h2><p>现在已经非常nice了，但是还是有一些没有解决的问题捏</p>
+<p><strong>基于setnx实现</strong>的分布式锁存在下面的问题：</p>
+<ul>
+<li><p>不可重入：同一线程无法多次获取同一把锁</p>
+<blockquote>
+<p>一个方法 <code>a</code>（先去获取锁）去调用方法 <code>b</code>（也需要获取同一把锁），若锁是不可重入的，则在 <code>a</code> 中获取锁之后，再调用 <code>b</code> 时，<code>b</code> 也尝试获取相同的锁。由于该锁是不可重入的，当前线程已经持有该锁，因此在 <code>b</code> 中无法再次成功获取锁，导致 <code>b</code> 无法继续执行。这样就会导致线程阻塞或者整个操作无法完成，因为同一线程无法再次获取已经持有的锁，无法实现预期的嵌套调用。</p>
+</blockquote>
+</li>
+<li><p>不可重试：获取🔒之尝试一次就返回false，没有重试机制</p>
+</li>
+<li><p>超时释放：虽然超时释放可以避免死锁，但是若业务耗时较长，也会导致锁释放，存在安全隐患</p>
+</li>
+<li><p>主从一致性：主从同步中可能出现的延迟问题。如果主服务器宕机，而从服务器还没完全同步主服务器的锁数据，那么可能会导致数据不一致。</p>
+</li>
+</ul>
+<p><strong>我们可以用Redisson来解决！</strong></p>
+<p><strong>下回请见Redisson篇分解</strong></p>
+
+      
+
+      
+        <div class="page-reward">
+          <a href="javascript:;" class="page-reward-btn tooltip-top">
+            <div class="tooltip tooltip-east">
+            <span class="tooltip-item">
+              赏
+            </span>
+            <span class="tooltip-content">
+              <span class="tooltip-text">
+                <span class="tooltip-inner">
+                  <p class="reward-p"><i class="icon icon-quo-left"></i>谢谢你请我吃糖果<i class="icon icon-quo-right"></i></p>
+                  <div class="reward-box">
+                    
+                    
+                  </div>
+                </span>
+              </span>
+            </span>
+          </div>
+          </a>
+        </div>
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
 	<div class="article-tag tagcloud">
 		<i class="icon-price-tags icon"></i>
 		<ul class="article-tag-list">
@@ -195,364 +417,105 @@
 		</ul>
 	</div>
 
-          
+      
 
+      
+
+      
+        
+<div class="share-btn share-icons tooltip-left">
+  <div class="tooltip tooltip-east">
+    <span class="tooltip-item">
+      <a href="javascript:;" class="share-sns share-outer">
+        <i class="icon icon-share"></i>
+      </a>
+    </span>
+    <span class="tooltip-content">
+      <div class="share-wrap">
+        <div class="share-icons">
+          <a class="weibo share-sns" href="javascript:;" data-type="weibo">
+            <i class="icon icon-weibo"></i>
+          </a>
+          <a class="weixin share-sns wxFab" href="javascript:;" data-type="weixin">
+            <i class="icon icon-weixin"></i>
+          </a>
+          <a class="qq share-sns" href="javascript:;" data-type="qq">
+            <i class="icon icon-qq"></i>
+          </a>
+          <a class="douban share-sns" href="javascript:;" data-type="douban">
+            <i class="icon icon-douban"></i>
+          </a>
+          <a class="qzone share-sns" href="javascript:;" data-type="qzone">
+            <i class="icon icon-qzone"></i>
+          </a>
+          <a class="facebook share-sns" href="javascript:;" data-type="facebook">
+            <i class="icon icon-facebook"></i>
+          </a>
+          <a class="twitter share-sns" href="javascript:;" data-type="twitter">
+            <i class="icon icon-twitter"></i>
+          </a>
+          <a class="google share-sns" href="javascript:;" data-type="google">
+            <i class="icon icon-google"></i>
+          </a>
         </div>
-        <div class="clearfix"></div>
-    </header>
+      </div>
+    </span>
+  </div>
+</div>
+
+<div class="page-modal wx-share js-wx-box">
+    <a class="close js-modal-close" href="javascript:;"><i class="icon icon-close"></i></a>
+    <p>扫一扫，分享到微信</p>
+    <div class="wx-qrcode">
+      <img src="//pan.baidu.com/share/qrcode?url=http://example.com/2024/12/12/Redis%E5%AE%9E%E7%8E%B0%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81/" alt="微信分享二维码">
+    </div>
+</div>
+
+<div class="mask js-mask"></div>
+      
+      <div class="clearfix"></div>
+    </div>
   </div>
 </article>
+
   
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2024/11/30/redis%E8%A7%A3%E5%86%B3%E4%BC%98%E6%83%A0%E5%88%B8%E7%A7%92%E6%9D%80/" class="archive-article-date">
-  	<time datetime="2024-11-30T08:54:08.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-11-30</time>
-</a>
+<nav id="article-nav">
+  
+  
+    <a href="/2024/11/30/redis%E8%A7%A3%E5%86%B3%E4%BC%98%E6%83%A0%E5%88%B8%E7%A7%92%E6%9D%80/" id="article-nav-older" class="article-nav-link-wrap">
+      <div class="article-nav-title">redis解决优惠券秒杀</div>
+      <i class="icon-circle-right"></i>
+    </a>
+  
+</nav>
+
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
         </div>
-    	 
+        
+        
+    </div>
+</aside>
+
+
+
   
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2024/11/30/redis%E8%A7%A3%E5%86%B3%E4%BC%98%E6%83%A0%E5%88%B8%E7%A7%92%E6%9D%80/">redis解决优惠券秒杀</a>
-    </h1>
+  
   
 
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">后端</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2024/11/27/%E7%BC%93%E5%AD%98%E5%B7%A5%E5%85%B7%E7%9A%84%E5%B0%81%E8%A3%85%EF%BC%88%E4%BD%BF%E7%94%A8StringRedisTemplate/" class="archive-article-date">
-  	<time datetime="2024-11-27T01:11:33.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-11-27</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2024/11/27/%E7%BC%93%E5%AD%98%E5%B7%A5%E5%85%B7%E7%9A%84%E5%B0%81%E8%A3%85%EF%BC%88%E4%BD%BF%E7%94%A8StringRedisTemplate/">缓存工具的封装（使用StringRedisTemplate)</a>
-    </h1>
   
 
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">后端</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2024/11/26/mysql%E9%9D%A2%E8%AF%95%E9%A2%98/" class="archive-article-date">
-  	<time datetime="2024-11-26T02:00:40.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-11-26</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2024/11/26/mysql%E9%9D%A2%E8%AF%95%E9%A2%98/">mysql面试题</a>
-    </h1>
   
 
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">后端</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2024/11/14/%E9%9D%A2%E8%AF%95%E9%A2%98%E2%80%94%E2%80%94redis/" class="archive-article-date">
-  	<time datetime="2024-11-14T11:24:34.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-11-14</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2024/11/14/%E9%9D%A2%E8%AF%95%E9%A2%98%E2%80%94%E2%80%94redis/">面试题——redis</a>
-    </h1>
-  
-
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">后端</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2024/11/07/%E7%94%A8redis%E6%9D%A5%E7%BC%93%E5%AD%98%E4%BB%A5%E5%8F%8A%E7%9B%B8%E5%85%B3%E9%97%AE%E9%A2%98/" class="archive-article-date">
-  	<time datetime="2024-11-07T01:47:52.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-11-07</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2024/11/07/%E7%94%A8redis%E6%9D%A5%E7%BC%93%E5%AD%98%E4%BB%A5%E5%8F%8A%E7%9B%B8%E5%85%B3%E9%97%AE%E9%A2%98/">用redis来缓存以及相关问题</a>
-    </h1>
-  
-
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">后端</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2024/11/06/java%E5%A4%9A%E7%BA%BF%E7%A8%8B%E7%BC%96%E7%A8%8B/" class="archive-article-date">
-  	<time datetime="2024-11-06T01:41:59.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-11-06</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2024/11/06/java%E5%A4%9A%E7%BA%BF%E7%A8%8B%E7%BC%96%E7%A8%8B/">java多线程编程</a>
-    </h1>
-  
-
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">后端</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2024/11/04/redis%E7%9A%84%E7%AE%80%E5%8D%95%E4%BD%BF%E7%94%A8%E2%80%9C/" class="archive-article-date">
-  	<time datetime="2024-11-04T08:33:24.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-11-04</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2024/11/04/redis%E7%9A%84%E7%AE%80%E5%8D%95%E4%BD%BF%E7%94%A8%E2%80%9C/">redis的简单使用“</a>
-    </h1>
-  
-
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">后端</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2024/11/04/VUE%E7%BB%84%E4%BB%B6%E5%BA%93Element%E7%9A%84%E7%AE%80%E5%8D%95%E4%BD%BF%E7%94%A8/" class="archive-article-date">
-  	<time datetime="2024-11-04T06:27:46.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-11-04</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2024/11/04/VUE%E7%BB%84%E4%BB%B6%E5%BA%93Element%E7%9A%84%E7%AE%80%E5%8D%95%E4%BD%BF%E7%94%A8/">VUE组件库Element的简单使用</a>
-    </h1>
-  
-
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">前端</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2024/11/01/Tomcat%E9%9B%86%E7%BE%A4%E7%9A%84session%E5%85%B1%E4%BA%AB%E9%97%AE%E9%A2%98/" class="archive-article-date">
-  	<time datetime="2024-11-01T01:18:29.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-11-01</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2024/11/01/Tomcat%E9%9B%86%E7%BE%A4%E7%9A%84session%E5%85%B1%E4%BA%AB%E9%97%AE%E9%A2%98/">Tomcat集群的session共享问题（用redis+session完成登录功能）</a>
-    </h1>
-  
-
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">后端</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-  
-    </div></section>
-  
-
-    
-    <nav id="page-nav">
-      <span class="page-number current">1</span><a class="page-number" href="/archives/page/2/">2</a><a class="extend next" rel="next" href="/archives/page/2/">Next &raquo;</a>
-    </nav>
   
 
 
@@ -576,8 +539,8 @@
 	var yiliaConfig = {
 		mathjax: false,
 		isHome: false,
-		isPost: false,
-		isArchive: true,
+		isPost: true,
+		isArchive: false,
 		isTag: false,
 		isCategory: false,
 		open_in_new: false,
