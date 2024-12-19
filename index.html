@@ -156,6 +156,172 @@
           <div id="js-content" class="content-ll">
             
   
+    <article id="post-redis实现消息队列" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2024/12/19/redis%E5%AE%9E%E7%8E%B0%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97/">redis实现消息队列</a>
+    </h1>
+  
+
+        
+        <a href="/2024/12/19/redis%E5%AE%9E%E7%8E%B0%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97/" class="archive-article-date">
+  	<time datetime="2024-12-19T06:45:51.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-12-19</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="/2024/12/19/redis%E5%AE%9E%E7%8E%B0%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-redis实现异步操作" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2024/12/17/redis%E5%AE%9E%E7%8E%B0%E5%BC%82%E6%AD%A5%E6%93%8D%E4%BD%9C/">redis实现异步操作</a>
+    </h1>
+  
+
+        
+        <a href="/2024/12/17/redis%E5%AE%9E%E7%8E%B0%E5%BC%82%E6%AD%A5%E6%93%8D%E4%BD%9C/" class="archive-article-date">
+  	<time datetime="2024-12-17T07:29:09.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-12-17</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h1 id="思路"><a href="#思路" class="headerlink" title="思路"></a>思路</h1><p>我们来回顾一下下单流程</p>
+<p>当用户发起请求，此时会请求nginx，nginx会访问到tomcat，而tomcat中的程序，会进行串行操作，分成如下几个步骤</p>
+<p>1、查询优惠卷</p>
+<p>2、判断秒杀库存是否足够</p>
+<p>3、查询订单</p>
+<p>4、校验是否是一人一单</p>
+<p>5、扣减库存</p>
+<p>6、创建订单</p>
+<p>在这六步操作中，又<strong>有很多操作是要去操作数据库</strong>的，而且还是一个线程串行执行， 这样就会导致我们的程序执行的很慢，所以我们需要异步程序执行，那么如何加速呢？</p>
+<p>在这里笔者想给大家分享一下课程内没有的思路，看看有没有小伙伴这么想，比如，我们可以不可以使用异步编排来做，或者说我开启N多线程，N多个线程，一个线程执行查询优惠卷，一个执行判断扣减库存，一个去创建订单等等，然后再统一做返回，这种做法和课程中有哪种好呢？答案是课程中的好，因为如果你采用我刚说的方式，如果访问的人很多，那么线程池中的线程可能一下子就被消耗完了，而且你使用上述方案，最大的特点在于，你觉得时效性会非常重要，但是你想想是吗？并不是，比如我只要确定他能做这件事，然后我后边慢慢做就可以了，我并不需要他一口气做完这件事，所以我们应当采用的是课程中，类似消息队列的方式来完成我们的需求，而不是使用线程池或者是异步编排的方式来完成这个需求</p>
+<p><strong>之前的方案：同步操作数据库</strong></p>
+<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/1653560986599.png" alt="1653560986599"></p>
+<p>优化方案：我们<strong>将耗时比较短的逻辑判断放入到redis中</strong>，比如是否库存足够，比如是否一人一单，这样的操作，只要这种逻辑可以完成，就意味着我们是一定可以下单完成的，我们只需要进行快速的逻辑判断，<strong>根本就不用等下单逻辑走完，我们直接给用户返回成功</strong>， <strong>再在后台开一个线程，后台线程慢慢的去执行queue里边的消息</strong>，这样程序不就超级快了吗？而且也不用担心线程池消耗殆尽的问题，因为这里我们的程序中并没有手动使用任何线程池，当然这里边有两个难点：</p>
+<ol>
+<li><p>是我们怎么在redis中去快速校验一人一单，还有库存判断</p>
+</li>
+<li><p>是由于我们校验和tomcat下单是两个线程，那么我们如何知道到底哪个单他最后是否成功，或者是下单完成，为了完成这件事我们在redis操作完之后，我们会将一些信息返回给前端，同时也会把这些信息丢到异步queue中去，后续操作中，可以通过这个id来查询我们tomcat中的下单逻辑是否完成了。</p>
+</li>
+</ol>
+<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/1653561657295.png" alt="1653561657295"></p>
+<p>简单来说，这个过程可以这样理解：</p>
+<ul>
+<li>用户发起下单请求。</li>
+<li>系统快速在Redis中校验是否可以下单（如库存、一人一单）。</li>
+<li>如果校验通过，立即告诉用户下单成功，并将订单信息放入异步队列。</li>
+<li>后台线程从队列中取出订单信息，执行真正的下单逻辑。</li>
+<li>用户可以通过订单ID查询订单的最新状态，以确认下单是否最终成功。</li>
+</ul>
+<p>我们现在来看看整体思路：当用户下单之后，判断库存是否充足只需要导redis中去根据key找对应的value是否大于0即可，如果不充足，则直接结束，如果充足，继续在redis中判断用户是否可以下单，如果set集合中没有这条数据，说明他可以下单，如果set集合中没有这条记录，则将userId和优惠卷存入到redis中，并且返回0，<strong>整个过程需要保证是原子性的，我们可以使用lua来操作</strong></p>
+<p>当以上判断逻辑走完之后，我们可以判断当前redis中返回的结果是否是0 ，如果是0，则表示可以下单，则将之前说的信息存入到到queue中去，然后返回，然后再来个线程异步的下单，前端可以通过返回的订单id来判断是否下单成功。</p>
+<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/1653562234886.png" alt="1653562234886"></p>
+<h3 id><a href="#" class="headerlink" title></a></h3>
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">后端</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="/2024/12/17/redis%E5%AE%9E%E7%8E%B0%E5%BC%82%E6%AD%A5%E6%93%8D%E4%BD%9C/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
     <article id="post-分布式锁-redission" class="article article-type-post  article-index" itemscope itemprop="blogPost">
   <div class="article-inner">
     
@@ -1496,405 +1662,6 @@
       
         <p class="article-more-link">
           <a class="article-more-a" href="/2024/11/06/java%E5%A4%9A%E7%BA%BF%E7%A8%8B%E7%BC%96%E7%A8%8B/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-redis的简单使用“" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2024/11/04/redis%E7%9A%84%E7%AE%80%E5%8D%95%E4%BD%BF%E7%94%A8%E2%80%9C/">redis的简单使用“</a>
-    </h1>
-  
-
-        
-        <a href="/2024/11/04/redis%E7%9A%84%E7%AE%80%E5%8D%95%E4%BD%BF%E7%94%A8%E2%80%9C/" class="archive-article-date">
-  	<time datetime="2024-11-04T08:33:24.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-11-04</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="2-Redis数据类型"><a href="#2-Redis数据类型" class="headerlink" title="2. Redis数据类型"></a>2. Redis数据类型</h2><h3 id="2-1-五种常用数据类型介绍"><a href="#2-1-五种常用数据类型介绍" class="headerlink" title="2.1 五种常用数据类型介绍"></a>2.1 五种常用数据类型介绍</h3><p>Redis存储的是key-value结构的数据，其中key是字符串类型，value有5种常用的数据类型：</p>
-<ul>
-<li>字符串 string</li>
-<li>哈希 hash</li>
-<li>列表 list</li>
-<li>集合 set</li>
-<li>有序集合 sorted set &#x2F; zset</li>
-</ul>
-<h3 id="2-2-各种数据类型特点"><a href="#2-2-各种数据类型特点" class="headerlink" title="2.2 各种数据类型特点"></a>2.2 各种数据类型特点</h3><p><img src="https://i-blog.csdnimg.cn/direct/47df6e689d274a4e9d5e700995c06d24.png" alt="在这里插入图片描述"></p>
-<p><strong>解释说明：</strong></p>
-<ul>
-<li>字符串(string)：普通字符串，Redis中最简单的数据类型</li>
-<li>哈希(hash)：也叫散列，类似于Java中的HashMap结构</li>
-<li>列表(list)：按照插入顺序排序，可以有重复元素，类似于Java中的LinkedList</li>
-<li>集合(set)：无序集合，没有重复元素，类似于Java中的HashSet</li>
-<li>有序集合(sorted set&#x2F;zset)：集合中每个元素关联一个分数(score)，根据分数升序排序，没有重复元素</li>
-</ul>
-<h2 id="3-Redis常用命令"><a href="#3-Redis常用命令" class="headerlink" title="3. Redis常用命令"></a>3. Redis常用命令</h2><h3 id="3-1-字符串操作命令"><a href="#3-1-字符串操作命令" class="headerlink" title="3.1 字符串操作命令"></a>3.1 字符串操作命令</h3><p>Redis 中字符串类型常用命令：</p>
-<ul>
-<li><strong>SET</strong> key value 					         设置指定key的值</li>
-<li><strong>GET</strong> key                                        获取指定key的值</li>
-<li><strong>SETEX</strong> key seconds value         设置指定key的值，并将 key 的过期时间设为 seconds 秒</li>
-<li><strong>SETNX</strong> key value                        只有在 key    不存在时设置 key 的值</li>
-</ul>
-<p>更多命令可以参考Redis中文网：<a target="_blank" rel="noopener" href="https://www.redis.net.cn/">https://www.redis.net.cn</a></p>
-<h3 id="3-2-哈希操作命令"><a href="#3-2-哈希操作命令" class="headerlink" title="3.2 哈希操作命令"></a>3.2 哈希操作命令</h3><p>Redis hash 是一个string类型的 field 和 value 的映射表，hash特别适合用于存储对象，常用命令：</p>
-<ul>
-<li><strong>HSET</strong> key field value             将哈希表 key 中的字段 field 的值设为 value</li>
-<li><strong>HGET</strong> key field                       获取存储在哈希表中指定字段的值</li>
-<li><strong>HDEL</strong> key field                       删除存储在哈希表中的指定字段</li>
-<li><strong>HKEYS</strong> key                              获取哈希表中所有字段</li>
-<li><strong>HVALS</strong> key                              获取哈希表中所有值</li>
-</ul>
-<p><img src="https://i-blog.csdnimg.cn/direct/ec9195a2c8644970bc47ea9fdf32e862.png" alt="&lt;img src=&quot;assets/image-20221130193121969.png&quot; alt=&quot;image-20221130193121969&quot; style=&quot;zoom: 67%;&quot; /&gt;"></p>
-<blockquote>
-<p>对应参数如下<br><img src="https://i-blog.csdnimg.cn/direct/c59bba1ad5f744cfa2eef38ea3a70cbf.png" alt="在这里插入图片描述"></p>
-</blockquote>
-<h3 id="3-3-列表操作命令"><a href="#3-3-列表操作命令" class="headerlink" title="3.3 列表操作命令"></a>3.3 列表操作命令</h3><p>Redis 列表是简单的字符串列表，按照插入顺序排序，常用命令：</p>
-<ul>
-<li><strong>LPUSH</strong> key value1 [value2]         将一个或多个值插入到列表头部</li>
-<li><strong>LRANGE</strong> key start stop                获取列表指定范围内的元素</li>
-<li><strong>RPOP</strong> key                                       移除并获取列表最后一个元素</li>
-<li><strong>LLEN</strong> key                                        获取列表长度</li>
-<li><strong>BRPOP</strong> key1 [key2 ] timeout       移出并获取列表的最后一个元素， 如果列表没有元素会阻塞列表直到等待超    时或发现可弹出元素为止</li>
-</ul>
-<blockquote>
-<p>注意：指令中（LPUSH为例）：L代表left  R代表right<br>如图：<br><img src="https://i-blog.csdnimg.cn/direct/d1cc3b1f20b4490a9ccc62cb93fc7c52.png" alt="在这里插入图片描述"></p>
-</blockquote>
-<h3 id="3-4-集合操作命令"><a href="#3-4-集合操作命令" class="headerlink" title="3.4 集合操作命令"></a>3.4 集合操作命令</h3><p>Redis set 是string类型的无序集合。集合成员是<strong>唯一</strong>的，这就意味着集合中<strong>不能出现重复的数据</strong>，常用命令：</p>
-<ul>
-<li><strong>SADD</strong> key member1 [member2]            向集合添加一个或多个成员</li>
-<li><strong>SMEMBERS</strong> key                                         返回集合中的所有成员</li>
-<li><strong>SCARD</strong> key                                                  获取集合的成员数</li>
-<li><strong>SINTER</strong> key1 [key2]                                   返回给定所有集合的交集</li>
-<li><strong>SUNION</strong> key1 [key2]                                 返回所有给定集合的并集</li>
-<li><strong>SREM</strong> key member1 [member2]            移除集合中一个或多个成员</li>
-</ul>
-<p><img src="https://i-blog.csdnimg.cn/direct/65f01c5281384e559c2c8e8b375f45fc.png" alt="在这里插入图片描述"></p>
-<h3 id="3-5-有序集合操作命令"><a href="#3-5-有序集合操作命令" class="headerlink" title="3.5 有序集合操作命令"></a>3.5 有序集合操作命令</h3><p>Redis有序集合是string类型元素的集合，且不允许有重复成员。每个元素都会关联一个double类型的分数。常用命令：</p>
-<p>常用命令：</p>
-<ul>
-<li><strong>ZADD</strong> key score1 member1 [score2 member2]     向有序集合添加一个或多个成员</li>
-<li><strong>ZRANGE</strong> key start stop [WITHSCORES]                     通过索引区间返回有序集合中指定区间内的成员 WITHSCORES：返回成员的同时返回成员的值</li>
-<li><strong>ZINCRBY</strong> key increment member                              有序集合中对指定成员的分数加上增量 increment</li>
-<li><strong>ZREM</strong> key member [member …]                                移除有序集合中的一个或多个成员</li>
-</ul>
-<p><img src="https://i-blog.csdnimg.cn/direct/ca7438036d8f4314897d1fcd98dfc4d5.png" alt="&lt;img src=&quot;assets/image-20221130193951036.png&quot; alt=&quot;image-20221130193951036&quot; style=&quot;zoom: 67%;&quot; /&gt;"></p>
-<h3 id="3-6-通用命令"><a href="#3-6-通用命令" class="headerlink" title="3.6 通用命令"></a>3.6 通用命令</h3><p>Redis的通用命令是不分数据类型的，都可以使用的命令：</p>
-<ul>
-<li>KEYS pattern 		查找所有符合给定模式( pattern)的 key </li>
-<li>EXISTS key 		检查给定 key 是否存在</li>
-<li>TYPE key 		返回 key 所储存的值的类型</li>
-<li>DEL key 		该命令用于在 key 存在是删除 key</li>
-</ul>
-<h2 id="4-在Java中操作Redis"><a href="#4-在Java中操作Redis" class="headerlink" title="4.在Java中操作Redis"></a>4.在Java中操作Redis</h2><h3 id="4-1-Redis的Java客户端"><a href="#4-1-Redis的Java客户端" class="headerlink" title="4.1 Redis的Java客户端"></a>4.1 Redis的Java客户端</h3><p>前面我们讲解了Redis的常用命令，这些命令是我们操作Redis的基础，那么我们在java程序中应该如何操作Redis呢？这就需要使用Redis的Java客户端，就如同我们使用JDBC操作MySQL数据库一样。</p>
-<p>Redis 的 Java 客户端很多，常用的几种：</p>
-<ul>
-<li>Jedis</li>
-<li>Lettuce</li>
-<li>Spring Data Redis</li>
-</ul>
-<p>Spring 对 Redis 客户端进行了整合，提供了 Spring Data Redis，在Spring Boot项目中还提供了对应的Starter，即 spring-boot-starter-data-redis。</p>
-<p>我们重点学习<strong>Spring Data Redis</strong>。</p>
-<h3 id="4-2-Spring-Data-Redis使用方式"><a href="#4-2-Spring-Data-Redis使用方式" class="headerlink" title="4.2 Spring Data Redis使用方式"></a>4.2 Spring Data Redis使用方式</h3><h4 id="4-2-1-介绍"><a href="#4-2-1-介绍" class="headerlink" title="4.2.1 介绍"></a>4.2.1 介绍</h4><p>Spring Data Redis 是 Spring 的一部分，提供了在 Spring 应用中通过简单的配置就可以访问 Redis 服务，对 Redis 底层开发包进行了高度封装。在 Spring 项目中，可以使用Spring Data Redis来简化 Redis 操作。</p>
-<p>网址：<a target="_blank" rel="noopener" href="https://spring.io/projects/spring-data-redis">https://spring.io/projects/spring-data-redis</a></p>
-<p><img src="https://i-blog.csdnimg.cn/direct/84dd33d23ea545dbb0bdb83b1462a103.png" alt="&lt;img src=&quot;assets/image-20210927143741458.png&quot; alt=&quot;image-20210927143741458&quot; style=&quot;zoom: 33%;&quot; /&gt;"></p>
-<p>Spring Boot提供了对应的Starter，maven坐标：</p>
-<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">dependency</span>&gt;</span></span><br><span class="line">	<span class="tag">&lt;<span class="name">groupId</span>&gt;</span>org.springframework.boot<span class="tag">&lt;/<span class="name">groupId</span>&gt;</span></span><br><span class="line">	<span class="tag">&lt;<span class="name">artifactId</span>&gt;</span>spring-boot-starter-data-redis<span class="tag">&lt;/<span class="name">artifactId</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">dependency</span>&gt;</span></span><br></pre></td></tr></table></figure>
-
-<p>Spring Data Redis中提供了一个高度封装的类：<strong>RedisTemplate</strong>，对相关api进行了归类封装,将同一类型操作封装为operation接口，具体分类如下：</p>
-<ul>
-<li>ValueOperations：string数据操作</li>
-<li>SetOperations：set类型数据操作</li>
-<li>ZSetOperations：zset类型数据操作</li>
-<li>HashOperations：hash类型的数据操作</li>
-<li>ListOperations：list类型的数据操作</li>
-</ul>
-<h4 id="4-2-2-环境搭建"><a href="#4-2-2-环境搭建" class="headerlink" title="4.2.2 环境搭建"></a>4.2.2 环境搭建</h4><p>进入到sky-server模块</p>
-<p><strong>1). 导入Spring Data Redis的maven坐标(已完成)</strong></p>
-<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">dependency</span>&gt;</span></span><br><span class="line">     <span class="tag">&lt;<span class="name">groupId</span>&gt;</span>org.springframework.boot<span class="tag">&lt;/<span class="name">groupId</span>&gt;</span></span><br><span class="line">     <span class="tag">&lt;<span class="name">artifactId</span>&gt;</span>spring-boot-starter-data-redis<span class="tag">&lt;/<span class="name">artifactId</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">dependency</span>&gt;</span></span><br></pre></td></tr></table></figure>
-
-
-
-<p><strong>2). 配置Redis数据源</strong></p>
-<p>在application-dev.yml中添加</p>
-<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">sky:</span></span><br><span class="line">  <span class="attr">redis:</span></span><br><span class="line">    <span class="attr">host:</span> <span class="string">localhost</span></span><br><span class="line">    <span class="attr">port:</span> <span class="number">6379</span></span><br><span class="line">    <span class="attr">password:</span> <span class="number">123456</span></span><br><span class="line">    <span class="attr">database:</span> <span class="number">10</span></span><br></pre></td></tr></table></figure>
-
-<p><strong>解释说明：</strong></p>
-<p>database:指定使用Redis的哪个数据库，Redis服务启动后默认有16个数据库，编号分别是从0到15。</p>
-<p>可以通过修改Redis配置文件来指定数据库的数量。</p>
-<p>在application.yml中添加读取application-dev.yml中的相关Redis配置</p>
-<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">spring:</span></span><br><span class="line">  <span class="attr">profiles:</span></span><br><span class="line">    <span class="attr">active:</span> <span class="string">dev</span></span><br><span class="line">  <span class="attr">redis:</span></span><br><span class="line">    <span class="attr">host:</span> <span class="string">$&#123;sky.redis.host&#125;</span></span><br><span class="line">    <span class="attr">port:</span> <span class="string">$&#123;sky.redis.port&#125;</span></span><br><span class="line">    <span class="attr">password:</span> <span class="string">$&#123;sky.redis.password&#125;</span></span><br><span class="line">    <span class="attr">database:</span> <span class="string">$&#123;sky.redis.database&#125;</span></span><br></pre></td></tr></table></figure>
-
-
-
-<p><strong>3). 编写配置类，创建RedisTemplate对象</strong></p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> com.sky.config;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> lombok.extern.slf4j.Slf4j;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Bean;</span><br><span class="line"><span class="keyword">import</span> org.springframework.context.annotation.Configuration;</span><br><span class="line"><span class="keyword">import</span> org.springframework.data.redis.connection.RedisConnectionFactory;</span><br><span class="line"><span class="keyword">import</span> org.springframework.data.redis.core.RedisTemplate;</span><br><span class="line"><span class="keyword">import</span> org.springframework.data.redis.serializer.StringRedisSerializer;</span><br><span class="line"></span><br><span class="line"><span class="meta">@Configuration</span></span><br><span class="line"><span class="meta">@Slf4j</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">RedisConfiguration</span> &#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Bean</span></span><br><span class="line">    <span class="keyword">public</span> RedisTemplate <span class="title function_">redisTemplate</span><span class="params">(RedisConnectionFactory redisConnectionFactory)</span>&#123;</span><br><span class="line">        log.info(<span class="string">&quot;开始创建redis模板对象...&quot;</span>);</span><br><span class="line">        <span class="type">RedisTemplate</span> <span class="variable">redisTemplate</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">RedisTemplate</span>();</span><br><span class="line">        <span class="comment">//设置redis的连接工厂对象</span></span><br><span class="line">        redisTemplate.setConnectionFactory(redisConnectionFactory);</span><br><span class="line">        <span class="comment">//设置redis key的序列化器</span></span><br><span class="line">        redisTemplate.setKeySerializer(<span class="keyword">new</span> <span class="title class_">StringRedisSerializer</span>());</span><br><span class="line">        <span class="keyword">return</span> redisTemplate;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p><strong>解释说明：</strong></p>
-<p>当前配置类不是必须的，因为 Spring Boot 框架会自动装配 RedisTemplate 对象，但是默认的key序列化器为</p>
-<p>JdkSerializationRedisSerializer，导致我们存到Redis中后的数据和原始数据有差别，故设置为</p>
-<p>StringRedisSerializer序列化器。</p>
-<blockquote>
-<p>无序列化器的结果：<br><img src="https://i-blog.csdnimg.cn/direct/e7bf532159144219988af1d2a750b27d.png" alt="在这里插入图片描述"></p>
-</blockquote>
-<p><strong>4). 通过RedisTemplate对象操作Redis</strong></p>
-<p>在test下新建测试类</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> com.sky.test;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> org.junit.jupiter.api.Test;</span><br><span class="line"><span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;</span><br><span class="line"><span class="keyword">import</span> org.springframework.boot.test.context.SpringBootTest;</span><br><span class="line"><span class="keyword">import</span> org.springframework.data.redis.core.*;</span><br><span class="line"></span><br><span class="line"><span class="meta">@SpringBootTest</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">SpringDataRedisTest</span> &#123;</span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> RedisTemplate redisTemplate;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Test</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">testRedisTemplate</span><span class="params">()</span>&#123;</span><br><span class="line">        System.out.println(redisTemplate);</span><br><span class="line">        <span class="comment">//string数据操作</span></span><br><span class="line">        <span class="type">ValueOperations</span> <span class="variable">valueOperations</span> <span class="operator">=</span> redisTemplate.opsForValue();</span><br><span class="line">        <span class="comment">//hash类型的数据操作</span></span><br><span class="line">        <span class="type">HashOperations</span> <span class="variable">hashOperations</span> <span class="operator">=</span> redisTemplate.opsForHash();</span><br><span class="line">        <span class="comment">//list类型的数据操作</span></span><br><span class="line">        <span class="type">ListOperations</span> <span class="variable">listOperations</span> <span class="operator">=</span> redisTemplate.opsForList();</span><br><span class="line">        <span class="comment">//set类型数据操作</span></span><br><span class="line">        <span class="type">SetOperations</span> <span class="variable">setOperations</span> <span class="operator">=</span> redisTemplate.opsForSet();</span><br><span class="line">        <span class="comment">//zset类型数据操作</span></span><br><span class="line">        <span class="type">ZSetOperations</span> <span class="variable">zSetOperations</span> <span class="operator">=</span> redisTemplate.opsForZSet();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>测试：</p>
-<p><img src="https://i-blog.csdnimg.cn/direct/cb3914c4a1a5452c909a61f170b6440a.png" alt="&lt;img src=&quot;assets/image-20221130205351403.png&quot; alt=&quot;image-20221130205351403&quot; style=&quot;zoom:50%;&quot; /&gt;"></p>
-<p>说明RedisTemplate对象注入成功，并且通过该RedisTemplate对象获取操作5种数据类型相关对象。</p>
-<p>上述环境搭建完毕后，接下来，我们就来具体对常见5种数据类型进行操作。</p>
-<h4 id="4-2-3-操作常见类型数据"><a href="#4-2-3-操作常见类型数据" class="headerlink" title="4.2.3 操作常见类型数据"></a>4.2.3 操作常见类型数据</h4><p><strong>1). 操作字符串类型数据</strong></p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">    * 操作字符串类型的数据</span></span><br><span class="line"><span class="comment">    */</span></span><br><span class="line">   <span class="meta">@Test</span></span><br><span class="line">   <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">testString</span><span class="params">()</span>&#123;</span><br><span class="line">       <span class="comment">// set get setex setnx</span></span><br><span class="line">       redisTemplate.opsForValue().set(<span class="string">&quot;city&quot;</span>,<span class="string">&quot;北京&quot;</span>);</span><br><span class="line">       <span class="type">String</span> <span class="variable">city</span> <span class="operator">=</span> (String) redisTemplate.opsForValue().get(<span class="string">&quot;city&quot;</span>);<span class="comment">//这个实际上返回的是object对象 需要强转String</span></span><br><span class="line">       System.out.println(city);</span><br><span class="line">       redisTemplate.opsForValue().set(<span class="string">&quot;code&quot;</span>,<span class="string">&quot;1234&quot;</span>,<span class="number">3</span>, TimeUnit.MINUTES);<span class="comment">//👈有效日期写法（此处为3min） 等于redis中的 setex </span></span><br><span class="line">       redisTemplate.opsForValue().setIfAbsent(<span class="string">&quot;lock&quot;</span>,<span class="string">&quot;1&quot;</span>);<span class="comment">// 不存在才执行set 故这行能执行</span></span><br><span class="line">       redisTemplate.opsForValue().setIfAbsent(<span class="string">&quot;lock&quot;</span>,<span class="string">&quot;2&quot;</span>);<span class="comment">//这行执行不了（因为上一行已经设置lock了</span></span><br><span class="line">   &#125;</span><br></pre></td></tr></table></figure>
-
-
-
-<p><strong>2). 操作哈希类型数据</strong></p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">    * 操作哈希类型的数据</span></span><br><span class="line"><span class="comment">    */</span></span><br><span class="line">   <span class="meta">@Test</span></span><br><span class="line">   <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">testHash</span><span class="params">()</span>&#123;</span><br><span class="line">       <span class="comment">//hset hget hdel hkeys hvals</span></span><br><span class="line">       <span class="type">HashOperations</span> <span class="variable">hashOperations</span> <span class="operator">=</span> redisTemplate.opsForHash();</span><br><span class="line"></span><br><span class="line">       hashOperations.put(<span class="string">&quot;100&quot;</span>,<span class="string">&quot;name&quot;</span>,<span class="string">&quot;tom&quot;</span>);<span class="comment">// 参数: key hashkey value</span></span><br><span class="line">       hashOperations.put(<span class="string">&quot;100&quot;</span>,<span class="string">&quot;age&quot;</span>,<span class="string">&quot;20&quot;</span>);</span><br><span class="line"></span><br><span class="line">       <span class="type">String</span> <span class="variable">name</span> <span class="operator">=</span> (String) hashOperations.get(<span class="string">&quot;100&quot;</span>, <span class="string">&quot;name&quot;</span>);<span class="comment">// 参数: key hashkey </span></span><br><span class="line">       System.out.println(name);</span><br><span class="line"></span><br><span class="line">       <span class="type">Set</span> <span class="variable">keys</span> <span class="operator">=</span> hashOperations.keys(<span class="string">&quot;100&quot;</span>);<span class="comment">//该key中所有hashkey</span></span><br><span class="line">       System.out.println(keys);</span><br><span class="line"></span><br><span class="line">       <span class="type">List</span> <span class="variable">values</span> <span class="operator">=</span> hashOperations.values(<span class="string">&quot;100&quot;</span>);<span class="comment">//该key中所有value</span></span><br><span class="line">       System.out.println(values);</span><br><span class="line"></span><br><span class="line">       hashOperations.delete(<span class="string">&quot;100&quot;</span>,<span class="string">&quot;age&quot;</span>);</span><br><span class="line">   &#125;</span><br></pre></td></tr></table></figure>
-
-
-
-<p><strong>3). 操作列表类型数据</strong></p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">    * 操作列表类型的数据</span></span><br><span class="line"><span class="comment">    */</span></span><br><span class="line">   <span class="meta">@Test</span></span><br><span class="line">   <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">testList</span><span class="params">()</span>&#123;</span><br><span class="line">       <span class="comment">//lpush lrange rpop llen</span></span><br><span class="line">       <span class="type">ListOperations</span> <span class="variable">listOperations</span> <span class="operator">=</span> redisTemplate.opsForList();</span><br><span class="line"></span><br><span class="line">       listOperations.leftPushAll(<span class="string">&quot;mylist&quot;</span>,<span class="string">&quot;a&quot;</span>,<span class="string">&quot;b&quot;</span>,<span class="string">&quot;c&quot;</span>);</span><br><span class="line">       listOperations.leftPush(<span class="string">&quot;mylist&quot;</span>,<span class="string">&quot;d&quot;</span>);</span><br><span class="line"></span><br><span class="line">       <span class="type">List</span> <span class="variable">mylist</span> <span class="operator">=</span> listOperations.range(<span class="string">&quot;mylist&quot;</span>, <span class="number">0</span>, -<span class="number">1</span>);</span><br><span class="line">       System.out.println(mylist);</span><br><span class="line"></span><br><span class="line">       listOperations.rightPop(<span class="string">&quot;mylist&quot;</span>);</span><br><span class="line"></span><br><span class="line">       <span class="type">Long</span> <span class="variable">size</span> <span class="operator">=</span> listOperations.size(<span class="string">&quot;mylist&quot;</span>);</span><br><span class="line">       System.out.println(size);</span><br><span class="line">   &#125;</span><br></pre></td></tr></table></figure>
-
-
-
-<p><strong>4). 操作集合类型数据</strong></p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">    * 操作集合类型的数据</span></span><br><span class="line"><span class="comment">    */</span></span><br><span class="line">   <span class="meta">@Test</span></span><br><span class="line">   <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">testSet</span><span class="params">()</span>&#123;</span><br><span class="line">       <span class="comment">//sadd smembers scard sinter sunion srem</span></span><br><span class="line">       <span class="type">SetOperations</span> <span class="variable">setOperations</span> <span class="operator">=</span> redisTemplate.opsForSet();</span><br><span class="line"></span><br><span class="line">       setOperations.add(<span class="string">&quot;set1&quot;</span>,<span class="string">&quot;a&quot;</span>,<span class="string">&quot;b&quot;</span>,<span class="string">&quot;c&quot;</span>,<span class="string">&quot;d&quot;</span>);</span><br><span class="line">       setOperations.add(<span class="string">&quot;set2&quot;</span>,<span class="string">&quot;a&quot;</span>,<span class="string">&quot;b&quot;</span>,<span class="string">&quot;x&quot;</span>,<span class="string">&quot;y&quot;</span>);</span><br><span class="line"></span><br><span class="line">       <span class="type">Set</span> <span class="variable">members</span> <span class="operator">=</span> setOperations.members(<span class="string">&quot;set1&quot;</span>);</span><br><span class="line">       System.out.println(members);</span><br><span class="line"></span><br><span class="line">       <span class="type">Long</span> <span class="variable">size</span> <span class="operator">=</span> setOperations.size(<span class="string">&quot;set1&quot;</span>);</span><br><span class="line">       System.out.println(size);</span><br><span class="line"></span><br><span class="line">       <span class="type">Set</span> <span class="variable">intersect</span> <span class="operator">=</span> setOperations.intersect(<span class="string">&quot;set1&quot;</span>, <span class="string">&quot;set2&quot;</span>);</span><br><span class="line">       System.out.println(intersect);</span><br><span class="line"></span><br><span class="line">       <span class="type">Set</span> <span class="variable">union</span> <span class="operator">=</span> setOperations.union(<span class="string">&quot;set1&quot;</span>, <span class="string">&quot;set2&quot;</span>);</span><br><span class="line">       System.out.println(union);</span><br><span class="line"></span><br><span class="line">       setOperations.remove(<span class="string">&quot;set1&quot;</span>,<span class="string">&quot;a&quot;</span>,<span class="string">&quot;b&quot;</span>);</span><br><span class="line">   &#125;</span><br></pre></td></tr></table></figure>
-
-
-
-<p><strong>5). 操作有序集合类型数据</strong></p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">    * 操作有序集合类型的数据</span></span><br><span class="line"><span class="comment">    */</span></span><br><span class="line">   <span class="meta">@Test</span></span><br><span class="line">   <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">testZset</span><span class="params">()</span>&#123;</span><br><span class="line">       <span class="comment">//zadd zrange zincrby zrem</span></span><br><span class="line">       <span class="type">ZSetOperations</span> <span class="variable">zSetOperations</span> <span class="operator">=</span> redisTemplate.opsForZSet();</span><br><span class="line"></span><br><span class="line">       zSetOperations.add(<span class="string">&quot;zset1&quot;</span>,<span class="string">&quot;a&quot;</span>,<span class="number">10</span>);</span><br><span class="line">       zSetOperations.add(<span class="string">&quot;zset1&quot;</span>,<span class="string">&quot;b&quot;</span>,<span class="number">12</span>);</span><br><span class="line">       zSetOperations.add(<span class="string">&quot;zset1&quot;</span>,<span class="string">&quot;c&quot;</span>,<span class="number">9</span>);</span><br><span class="line"></span><br><span class="line">       <span class="type">Set</span> <span class="variable">zset1</span> <span class="operator">=</span> zSetOperations.range(<span class="string">&quot;zset1&quot;</span>, <span class="number">0</span>, -<span class="number">1</span>);</span><br><span class="line">       System.out.println(zset1);</span><br><span class="line"></span><br><span class="line">       zSetOperations.incrementScore(<span class="string">&quot;zset1&quot;</span>,<span class="string">&quot;c&quot;</span>,<span class="number">10</span>);</span><br><span class="line"></span><br><span class="line">       zSetOperations.remove(<span class="string">&quot;zset1&quot;</span>,<span class="string">&quot;a&quot;</span>,<span class="string">&quot;b&quot;</span>);</span><br><span class="line">   &#125;</span><br></pre></td></tr></table></figure>
-
-
-
-<p><strong>6). 通用命令操作</strong></p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">    * 通用命令操作</span></span><br><span class="line"><span class="comment">    */</span></span><br><span class="line">   <span class="meta">@Test</span></span><br><span class="line">   <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">testCommon</span><span class="params">()</span>&#123;</span><br><span class="line">       <span class="comment">//keys exists type del</span></span><br><span class="line">       <span class="type">Set</span> <span class="variable">keys</span> <span class="operator">=</span> redisTemplate.keys(<span class="string">&quot;*&quot;</span>);</span><br><span class="line">       System.out.println(keys);</span><br><span class="line"></span><br><span class="line">       <span class="type">Boolean</span> <span class="variable">name</span> <span class="operator">=</span> redisTemplate.hasKey(<span class="string">&quot;name&quot;</span>);</span><br><span class="line">       <span class="type">Boolean</span> <span class="variable">set1</span> <span class="operator">=</span> redisTemplate.hasKey(<span class="string">&quot;set1&quot;</span>);</span><br><span class="line"></span><br><span class="line">       <span class="keyword">for</span> (Object key : keys) &#123;</span><br><span class="line">           <span class="type">DataType</span> <span class="variable">type</span> <span class="operator">=</span> redisTemplate.type(key);</span><br><span class="line">           System.out.println(type.name());</span><br><span class="line">       &#125;</span><br><span class="line"></span><br><span class="line">       redisTemplate.delete(<span class="string">&quot;mylist&quot;</span>);</span><br><span class="line">   &#125;</span><br></pre></td></tr></table></figure>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">后端</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="/2024/11/04/redis%E7%9A%84%E7%AE%80%E5%8D%95%E4%BD%BF%E7%94%A8%E2%80%9C/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-VUE组件库Element的简单使用" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2024/11/04/VUE%E7%BB%84%E4%BB%B6%E5%BA%93Element%E7%9A%84%E7%AE%80%E5%8D%95%E4%BD%BF%E7%94%A8/">VUE组件库Element的简单使用</a>
-    </h1>
-  
-
-        
-        <a href="/2024/11/04/VUE%E7%BB%84%E4%BB%B6%E5%BA%93Element%E7%9A%84%E7%AE%80%E5%8D%95%E4%BD%BF%E7%94%A8/" class="archive-article-date">
-  	<time datetime="2024-11-04T06:27:46.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2024-11-04</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h1 id="部署工作"><a href="#部署工作" class="headerlink" title="部署工作"></a>部署工作</h1><h2 id="先创建个vue项目"><a href="#先创建个vue项目" class="headerlink" title="先创建个vue项目"></a>先创建个vue项目</h2><p>先准备vue环境哈<br>环境弄好了在目标路径打开命令行<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/76351aabd9ecd1a54653abfe654ebd4b.png" alt="在这里插入图片描述"><br>在输入vue ui，打开项目管理器<img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/47fe97721ac9845b041d2adcce9f7072.png" alt="在这里插入图片描述"><br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/9411cb2a3327a816ef92d173d49aadae.png" alt="在这里插入图片描述"><br>创建个vue项目</p>
-<h2 id="安装ElementUI组件库（在当前工程目录下）"><a href="#安装ElementUI组件库（在当前工程目录下）" class="headerlink" title="安装ElementUI组件库（在当前工程目录下）"></a>安装ElementUI组件库（在当前工程目录下）</h2><p>（此流程在vscode中演示）</p>
-<p>右键项目文件夹，在集成终端中打开<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/aa6de7758aa7670cb6ab03187bd05701.png" alt="在这里插入图片描述"><br>执行以下命令：</p>
-<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">install element-ui@<span class="number">2</span>.<span class="number">15</span>.<span class="number">3</span>npm</span><br></pre></td></tr></table></figure>
-
-<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/fa4e1c08ed32d62111be468fcce4b37f.png" alt="在这里插入图片描述"><br>然后我们就会发现在项目文件夹中有个文件夹<strong>node-module</strong>,里面有个文件夹<strong>element-ui</strong>。<br>这个就代表已经安装成功了~<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/6c94935451f68e7e25b65889e3779602.png" alt="在这里插入图片描述"></p>
-<h2 id="引入ElementUI的组件库"><a href="#引入ElementUI的组件库" class="headerlink" title="引入ElementUI的组件库"></a>引入ElementUI的组件库</h2><p>我们先看官方文档：<br>完整引入<br>在 main.js 中写入以下内容：</p>
-<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> <span class="title class_">Vue</span> <span class="keyword">from</span> <span class="string">&#x27;vue&#x27;</span>;</span><br><span class="line"><span class="keyword">import</span> <span class="title class_">ElementUI</span> <span class="keyword">from</span> <span class="string">&#x27;element-ui&#x27;</span>;</span><br><span class="line"><span class="keyword">import</span> <span class="string">&#x27;element-ui/lib/theme-chalk/index.css&#x27;</span>;</span><br><span class="line"><span class="keyword">import</span> <span class="title class_">App</span> <span class="keyword">from</span> <span class="string">&#x27;./App.vue&#x27;</span>;</span><br><span class="line"></span><br><span class="line"><span class="title class_">Vue</span>.<span class="title function_">use</span>(<span class="title class_">ElementUI</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">new</span> <span class="title class_">Vue</span>(&#123;</span><br><span class="line">  <span class="attr">el</span>: <span class="string">&#x27;#app&#x27;</span>,</span><br><span class="line">  <span class="attr">render</span>: <span class="function"><span class="params">h</span> =&gt;</span> <span class="title function_">h</span>(<span class="title class_">App</span>)</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
-<p>反正官方文档是这么说的，但是如果我们在创建vue项目的时候勾选了一些其他的功能，比如说我选的就是route功能：<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/c257546f364a8cac1bc7311c3246255c.png" alt="在这里插入图片描述"><br>那我相较于官方文档还要多一行，所以大伙自己调整就行</p>
-<p>然后我们可以在views文件下下面新建个element文件夹专门存储组件<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/fc812c29f0f9ff7ae41db74448089cc6.png" alt="在这里插入图片描述"><br>然后再在这个文件夹里面新建一个vue文件</p>
-<p> 在这个vue文件里搞一个vue文件的<strong>基本结构</strong></p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">template</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">div</span>&gt;</span></span><br><span class="line">        </span><br><span class="line">    <span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">template</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">script</span>&gt;</span><span class="language-javascript"></span></span><br><span class="line"><span class="language-javascript">	<span class="keyword">export</span> <span class="keyword">default</span> &#123;</span></span><br><span class="line"><span class="language-javascript">    </span></span><br><span class="line"><span class="language-javascript">&#125;</span></span><br><span class="line"><span class="language-javascript"></span><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">style</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;/<span class="name">style</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<p>这是一个使用Vue.js框架编写的简单组件结构。这个结构包含三个部分：</p>
-<ol>
-<li><code>&lt;template&gt;</code>：这个部分定义了组件的HTML结构。</li>
-<li><code>&lt;script&gt;</code>：这个部分包含了组件的JavaScript逻辑。<code>export default &#123;&#125;</code>表示导出一个默认的Vue组件对象。</li>
-<li><code>&lt;style&gt;</code>：这个部分定义了组件的CSS样式。</li>
-</ol>
-<p>然后启动项目：<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/fb688ae3a14e2e7b2959b427116e3bcb.png" alt="在这里插入图片描述"></p>
-<p>我们会发现初始界面仍然是App.vue的界面,<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/02453af5f5c40edbcaedb925e72fc4c8.png" alt="在这里插入图片描述"></p>
-<p>我们还需要作对App.vue文件做出一些更改:<br>原来的是:<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/6583b932eb77b0ae395e781b5b6e6339.png" alt="在这里插入图片描述"></p>
-<p>把之前的注释掉,再在下面新建一个script标签:<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/d77092e46344b3aac1c70e7eee038ef2.png" alt="在这里插入图片描述"></p>
-<p>再在注释的地方新建一个新的标签:<br>当新建这个标签的时候,下面script标签就会自己出现一堆东西<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/ac7adc2c177d267e6d1df5377544bcaa.png" alt="在这里插入图片描述"></p>
-<p>现在就已经改好啦,界面就是白白的了,因为我们还没加入任何的组件<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/973a732805044fc6af9c805608ad19da.png" alt="在这里插入图片描述"></p>
-<h1 id="开始使用组件"><a href="#开始使用组件" class="headerlink" title="开始使用组件"></a>开始使用组件</h1><h2 id="Button-按钮组件"><a href="#Button-按钮组件" class="headerlink" title="Button 按钮组件"></a>Button 按钮组件</h2><p>然后就试试最简单的按钮组件<br>先用按钮试试<br>打开<a target="_blank" rel="noopener" href="https://element.eleme.cn/#/zh-CN/component/button">https://element.eleme.cn/#/zh-CN/component/button</a><br>复制官网的这一坨</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">el-row</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">el-button</span>&gt;</span>默认按钮<span class="tag">&lt;/<span class="name">el-button</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">el-button</span> <span class="attr">type</span>=<span class="string">&quot;primary&quot;</span>&gt;</span>主要按钮<span class="tag">&lt;/<span class="name">el-button</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">el-button</span> <span class="attr">type</span>=<span class="string">&quot;success&quot;</span>&gt;</span>成功按钮<span class="tag">&lt;/<span class="name">el-button</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">el-button</span> <span class="attr">type</span>=<span class="string">&quot;info&quot;</span>&gt;</span>信息按钮<span class="tag">&lt;/<span class="name">el-button</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">el-button</span> <span class="attr">type</span>=<span class="string">&quot;warning&quot;</span>&gt;</span>警告按钮<span class="tag">&lt;/<span class="name">el-button</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">el-button</span> <span class="attr">type</span>=<span class="string">&quot;danger&quot;</span>&gt;</span>危险按钮<span class="tag">&lt;/<span class="name">el-button</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">el-row</span>&gt;</span></span><br></pre></td></tr></table></figure>
-
-<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/b11152bcea1c175157d8c05e38f8646c.png" alt="在这里插入图片描述"><br>复制到咱们之前的那个ElementView.view文件中的template标签中<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/bf040eebdf0bb40268e11fc1266390c6.png" alt="在这里插入图片描述"><br><strong>完整代码如下:</strong></p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">template</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">div</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">el-row</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">el-button</span>&gt;</span>默认按钮<span class="tag">&lt;/<span class="name">el-button</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">el-button</span> <span class="attr">type</span>=<span class="string">&quot;primary&quot;</span>&gt;</span>主要按钮<span class="tag">&lt;/<span class="name">el-button</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">el-button</span> <span class="attr">type</span>=<span class="string">&quot;success&quot;</span>&gt;</span>成功按钮<span class="tag">&lt;/<span class="name">el-button</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">el-button</span> <span class="attr">type</span>=<span class="string">&quot;info&quot;</span>&gt;</span>信息按钮<span class="tag">&lt;/<span class="name">el-button</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">el-button</span> <span class="attr">type</span>=<span class="string">&quot;warning&quot;</span>&gt;</span>警告按钮<span class="tag">&lt;/<span class="name">el-button</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">el-button</span> <span class="attr">type</span>=<span class="string">&quot;danger&quot;</span>&gt;</span>危险按钮<span class="tag">&lt;/<span class="name">el-button</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">el-row</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">template</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">script</span>&gt;</span><span class="language-javascript"></span></span><br><span class="line"><span class="language-javascript"><span class="keyword">export</span> <span class="keyword">default</span> &#123;&#125;;</span></span><br><span class="line"><span class="language-javascript"></span><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">style</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">style</span>&gt;</span></span><br></pre></td></tr></table></figure>
-
-
-<h2 id="Table-表格组件"><a href="#Table-表格组件" class="headerlink" title="Table 表格组件"></a>Table 表格组件</h2><p>官方文档: <a target="_blank" rel="noopener" href="https://element.eleme.cn/#/zh-CN/component/table">https://element.eleme.cn/#/zh-CN/component/table</a><br>先以这个为例:</p>
-<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/b51ddad506e2724f3dcb19d6ee62a42e.png" alt="在这里插入图片描述"></p>
-<p>官方文档中提供的代码如下:</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">template</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">el-table</span></span></span><br><span class="line"><span class="tag">    <span class="attr">:data</span>=<span class="string">&quot;tableData&quot;</span></span></span><br><span class="line"><span class="tag">    <span class="attr">border</span></span></span><br><span class="line"><span class="tag">    <span class="attr">style</span>=<span class="string">&quot;width: 100%&quot;</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">el-table-column</span></span></span><br><span class="line"><span class="tag">      <span class="attr">prop</span>=<span class="string">&quot;date&quot;</span></span></span><br><span class="line"><span class="tag">      <span class="attr">label</span>=<span class="string">&quot;日期&quot;</span></span></span><br><span class="line"><span class="tag">      <span class="attr">width</span>=<span class="string">&quot;180&quot;</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">el-table-column</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">el-table-column</span></span></span><br><span class="line"><span class="tag">      <span class="attr">prop</span>=<span class="string">&quot;name&quot;</span></span></span><br><span class="line"><span class="tag">      <span class="attr">label</span>=<span class="string">&quot;姓名&quot;</span></span></span><br><span class="line"><span class="tag">      <span class="attr">width</span>=<span class="string">&quot;180&quot;</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">el-table-column</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">el-table-column</span></span></span><br><span class="line"><span class="tag">      <span class="attr">prop</span>=<span class="string">&quot;address&quot;</span></span></span><br><span class="line"><span class="tag">      <span class="attr">label</span>=<span class="string">&quot;地址&quot;</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">el-table-column</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;/<span class="name">el-table</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">template</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">script</span>&gt;</span><span class="language-javascript"></span></span><br><span class="line"><span class="language-javascript">  <span class="keyword">export</span> <span class="keyword">default</span> &#123;</span></span><br><span class="line"><span class="language-javascript">    <span class="title function_">data</span>(<span class="params"></span>) &#123;</span></span><br><span class="line"><span class="language-javascript">      <span class="keyword">return</span> &#123;</span></span><br><span class="line"><span class="language-javascript">        <span class="attr">tableData</span>: [&#123;</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">date</span>: <span class="string">&#x27;2016-05-02&#x27;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">name</span>: <span class="string">&#x27;王小虎&#x27;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">address</span>: <span class="string">&#x27;上海市普陀区金沙江路 1518 弄&#x27;</span></span></span><br><span class="line"><span class="language-javascript">        &#125;, &#123;</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">date</span>: <span class="string">&#x27;2016-05-04&#x27;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">name</span>: <span class="string">&#x27;王小虎&#x27;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">address</span>: <span class="string">&#x27;上海市普陀区金沙江路 1517 弄&#x27;</span></span></span><br><span class="line"><span class="language-javascript">        &#125;, &#123;</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">date</span>: <span class="string">&#x27;2016-05-01&#x27;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">name</span>: <span class="string">&#x27;王小虎&#x27;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">address</span>: <span class="string">&#x27;上海市普陀区金沙江路 1519 弄&#x27;</span></span></span><br><span class="line"><span class="language-javascript">        &#125;, &#123;</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">date</span>: <span class="string">&#x27;2016-05-03&#x27;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">name</span>: <span class="string">&#x27;王小虎&#x27;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">address</span>: <span class="string">&#x27;上海市普陀区金沙江路 1516 弄&#x27;</span></span></span><br><span class="line"><span class="language-javascript">        &#125;]</span></span><br><span class="line"><span class="language-javascript">      &#125;</span></span><br><span class="line"><span class="language-javascript">    &#125;</span></span><br><span class="line"><span class="language-javascript">  &#125;</span></span><br><span class="line"><span class="language-javascript"></span><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br></pre></td></tr></table></figure>
-
-<p>那我们就先把template标签中el-table标签中的代码(注意不包括template标签)复制下来,放进我们之前新建的ElementView.vue文件中去:<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/27ad3f1bd8d9fdeb2d82b50a903d8317.png" alt="在这里插入图片描述"><br>加入之后就是这样了,现在没得数据<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/d08c36b1b530daab43175faeb4b58f7e.png" alt="在这里插入图片描述"></p>
-<p>然后我们再把下面一坨也复制过来(这个表格就需要复制script的部分,而上面的按钮那个就不需要)</p>
-<p><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/83cb6f5a123e647534f457ff6cd1ff0f.png" alt="在这里插入图片描述"><br>数据就来了!<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/bc79e62911f00925170c1ee66aa0a188.png" alt="在这里插入图片描述"><br>总代码如下:</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">template</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">div</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">el-row</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">el-button</span>&gt;</span>默认按钮<span class="tag">&lt;/<span class="name">el-button</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">el-button</span> <span class="attr">type</span>=<span class="string">&quot;primary&quot;</span>&gt;</span>主要按钮<span class="tag">&lt;/<span class="name">el-button</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">el-button</span> <span class="attr">type</span>=<span class="string">&quot;success&quot;</span>&gt;</span>成功按钮<span class="tag">&lt;/<span class="name">el-button</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">el-button</span> <span class="attr">type</span>=<span class="string">&quot;info&quot;</span>&gt;</span>信息按钮<span class="tag">&lt;/<span class="name">el-button</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">el-button</span> <span class="attr">type</span>=<span class="string">&quot;warning&quot;</span>&gt;</span>警告按钮<span class="tag">&lt;/<span class="name">el-button</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">el-button</span> <span class="attr">type</span>=<span class="string">&quot;danger&quot;</span>&gt;</span>危险按钮<span class="tag">&lt;/<span class="name">el-button</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">el-row</span>&gt;</span></span><br><span class="line"></span><br><span class="line">    <span class="tag">&lt;<span class="name">br</span> /&gt;</span><span class="tag">&lt;<span class="name">br</span> /&gt;</span><span class="tag">&lt;<span class="name">br</span> /&gt;</span></span><br><span class="line">    <span class="comment">&lt;!-- 下面是表格 --&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">el-table</span> <span class="attr">:data</span>=<span class="string">&quot;tableData&quot;</span> <span class="attr">border</span> <span class="attr">style</span>=<span class="string">&quot;width: 100%&quot;</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">el-table-column</span> <span class="attr">prop</span>=<span class="string">&quot;date&quot;</span> <span class="attr">label</span>=<span class="string">&quot;日期&quot;</span> <span class="attr">width</span>=<span class="string">&quot;180&quot;</span>&gt;</span> <span class="tag">&lt;/<span class="name">el-table-column</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">el-table-column</span> <span class="attr">prop</span>=<span class="string">&quot;name&quot;</span> <span class="attr">label</span>=<span class="string">&quot;姓名&quot;</span> <span class="attr">width</span>=<span class="string">&quot;180&quot;</span>&gt;</span> <span class="tag">&lt;/<span class="name">el-table-column</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">el-table-column</span> <span class="attr">prop</span>=<span class="string">&quot;address&quot;</span> <span class="attr">label</span>=<span class="string">&quot;地址&quot;</span>&gt;</span> <span class="tag">&lt;/<span class="name">el-table-column</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">el-table</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">template</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">script</span>&gt;</span><span class="language-javascript"></span></span><br><span class="line"><span class="language-javascript"><span class="keyword">export</span> <span class="keyword">default</span> &#123;</span></span><br><span class="line"><span class="language-javascript">  <span class="title function_">data</span>(<span class="params"></span>) &#123;</span></span><br><span class="line"><span class="language-javascript">    <span class="keyword">return</span> &#123;</span></span><br><span class="line"><span class="language-javascript">      <span class="attr">tableData</span>: [</span></span><br><span class="line"><span class="language-javascript">        &#123;</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">date</span>: <span class="string">&quot;2016-05-02&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">name</span>: <span class="string">&quot;王小虎&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">address</span>: <span class="string">&quot;上海市普陀区金沙江路 1518 弄&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">        &#125;,</span></span><br><span class="line"><span class="language-javascript">        &#123;</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">date</span>: <span class="string">&quot;2016-05-04&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">name</span>: <span class="string">&quot;王小虎&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">address</span>: <span class="string">&quot;上海市普陀区金沙江路 1517 弄&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">        &#125;,</span></span><br><span class="line"><span class="language-javascript">        &#123;</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">date</span>: <span class="string">&quot;2016-05-01&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">name</span>: <span class="string">&quot;王小虎&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">address</span>: <span class="string">&quot;上海市普陀区金沙江路 1519 弄&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">        &#125;,</span></span><br><span class="line"><span class="language-javascript">        &#123;</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">date</span>: <span class="string">&quot;2016-05-03&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">name</span>: <span class="string">&quot;王小虎&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">address</span>: <span class="string">&quot;上海市普陀区金沙江路 1516 弄&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">        &#125;,</span></span><br><span class="line"><span class="language-javascript">      ],</span></span><br><span class="line"><span class="language-javascript">    &#125;;</span></span><br><span class="line"><span class="language-javascript">  &#125;,</span></span><br><span class="line"><span class="language-javascript">&#125;;</span></span><br><span class="line"><span class="language-javascript"></span><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">style</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">style</span>&gt;</span></span><br></pre></td></tr></table></figure>
-
-<h2 id="Pagination-分页组件"><a href="#Pagination-分页组件" class="headerlink" title="Pagination 分页组件"></a>Pagination 分页组件</h2><h3 id="页面的插入"><a href="#页面的插入" class="headerlink" title="页面的插入"></a>页面的插入</h3><p>就长这样👇<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/17410994ee157ff4fcdaa10ccc0c121a.png" alt="在这里插入图片描述"><br>我们以这个为例:<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/76cf011c9560848f3cdc63a1de04c914.png" alt="在这里插入图片描述"></p>
-<p>官方代码如下:</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">el-pagination</span></span></span><br><span class="line"><span class="tag">  <span class="attr">background</span></span></span><br><span class="line"><span class="tag">  <span class="attr">layout</span>=<span class="string">&quot;prev, pager, next&quot;</span></span></span><br><span class="line"><span class="tag">  <span class="attr">:total</span>=<span class="string">&quot;1000&quot;</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">el-pagination</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<p>我们直接复制到vue文件里面去:<br>现在就长这样:<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/ecedce4e8d3f6f385ebc997cb4dfed18.png" alt="在这里插入图片描述"><br>接下来我们看看官方文档中的Attributes,了解下每个属性都是干嘛的:<br>在这个分页组件中只涉及到了如下的属性,以及它们的功能👇</p>
-<table>
-<thead>
-<tr>
-<th>参数</th>
-<th>说明</th>
-<th>类型</th>
-<th>可选值</th>
-<th>默认值</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>background</td>
-<td>是否为分页按钮添加背景色</td>
-<td>boolean</td>
-<td>—</td>
-<td>false</td>
-</tr>
-<tr>
-<td>total</td>
-<td>总条目数</td>
-<td>number</td>
-<td>—</td>
-<td>—</td>
-</tr>
-<tr>
-<td>layout</td>
-<td>组件布局，子组件名用逗号分隔</td>
-<td>String</td>
-<td>sizes, prev, pager, next, jumper, -&gt;, total, slot</td>
-<td>‘prev, pager, next, jumper, -&gt;, total’</td>
-</tr>
-</tbody></table>
-<p>前两个非常容易看懂,那么这个layout的可选值都长啥样子呢?<br>我们把这些可选值都塞进layout里面去:<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/091577e20c20ffdb441e7f3df6af3255.png" alt="在这里插入图片描述"><br>页面现在是这样了<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/f828261cf591a02330632762768a7b43.png" alt="在这里插入图片描述"><br>说明!对应如图<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/db051da6962689e0ecd636b9fbde8468.png" alt="在这里插入图片描述"><br>如果把这些个<strong>可选值的顺序改变</strong>,那么这些<strong>小部件的顺序也会相应改变</strong></p>
-<h3 id="event的触发"><a href="#event的触发" class="headerlink" title="event的触发"></a>event的触发</h3><p>官方文档:<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/2a25c7513b8afad279c9199ea797c5b5.png" alt="在这里插入图片描述"><br>我们主要研究前两个事件<br>那怎么研究呢?咱看看官方文档中的”附加功能”:<br>这个里面就有说这两个功能的使用演示<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/76415d5ca6d8f4cab6b997ec4840db69.png" alt="在这里插入图片描述"><br>我们主要关注这两行:<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/4ae1adc0486400a46706ae05ccb87105.png" alt="在这里插入图片描述"><br>这两行就相当于是事件监听,双引号中的handleSizeChange和handleCurrentChange就是事件监听所触发的函数,<br>我们先在el-pagination中插入这两个事件监听:<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/f2e041670a9b07d62eeae1bfe928a5a8.png" alt="在这里插入图片描述"><br>既然是事件监听,那么我们还要写所触发的函数<br>接下来操作script:<br>添加methods,里面写所触发的函数:<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/199eabadd3174ab55e58a50561705951.png" alt="在这里插入图片描述"></p>
-<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">methods</span>: &#123;</span><br><span class="line">  <span class="attr">handleSizeChange</span>: <span class="keyword">function</span> (<span class="params">val</span>) &#123;</span><br><span class="line">    <span class="title function_">alert</span>(<span class="string">&quot;每页记录数发生变化&quot;</span> + val);</span><br><span class="line">  &#125;,</span><br><span class="line">  <span class="attr">handleCurrentChange</span>: <span class="keyword">function</span> (<span class="params">val</span>) &#123;</span><br><span class="line">    <span class="title function_">alert</span>(<span class="string">&quot;页码发生变化&quot;</span> + val);</span><br><span class="line">  &#125;,</span><br><span class="line">&#125;,</span><br></pre></td></tr></table></figure>
-<p>可见这俩的参数都是数字,所以我们都设置一个val作为传入参数<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/605629e4aec4595af2a8eec319c61eba.png" alt="在这里插入图片描述"></p>
-<p>测试handleSizeChange方法:<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/3f276e5693ec6b3d17d3b557cc4eb9b4.png" alt="handleSizeChange"><br>测试handleCurrentChange方法:<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/53473d0254a7a5cc938c089618def2f3.png" alt="在这里插入图片描述"></p>
-<h2 id="Dialog-对话框"><a href="#Dialog-对话框" class="headerlink" title="Dialog 对话框"></a>Dialog 对话框</h2><p>就长这样,蹦出来个窗口:<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/e56a23ee48ffcbc1290f0118fa66687c.png" alt="在这里插入图片描述"><br>官方代码:</p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">&lt;!-- Table --&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">el-button</span> <span class="attr">type</span>=<span class="string">&quot;text&quot;</span> @<span class="attr">click</span>=<span class="string">&quot;dialogTableVisible = true&quot;</span>&gt;</span>打开嵌套表格的 Dialog<span class="tag">&lt;/<span class="name">el-button</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">el-dialog</span> <span class="attr">title</span>=<span class="string">&quot;收货地址&quot;</span> <span class="attr">:visible.sync</span>=<span class="string">&quot;dialogTableVisible&quot;</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">el-table</span> <span class="attr">:data</span>=<span class="string">&quot;gridData&quot;</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">el-table-column</span> <span class="attr">property</span>=<span class="string">&quot;date&quot;</span> <span class="attr">label</span>=<span class="string">&quot;日期&quot;</span> <span class="attr">width</span>=<span class="string">&quot;150&quot;</span>&gt;</span><span class="tag">&lt;/<span class="name">el-table-column</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">el-table-column</span> <span class="attr">property</span>=<span class="string">&quot;name&quot;</span> <span class="attr">label</span>=<span class="string">&quot;姓名&quot;</span> <span class="attr">width</span>=<span class="string">&quot;200&quot;</span>&gt;</span><span class="tag">&lt;/<span class="name">el-table-column</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">el-table-column</span> <span class="attr">property</span>=<span class="string">&quot;address&quot;</span> <span class="attr">label</span>=<span class="string">&quot;地址&quot;</span>&gt;</span><span class="tag">&lt;/<span class="name">el-table-column</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;/<span class="name">el-table</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">el-dialog</span>&gt;</span></span><br></pre></td></tr></table></figure>
-<p>再把下面这坨复制进去</p>
-<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">gridData</span>: [</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="attr">date</span>: <span class="string">&quot;2016-05-02&quot;</span>,</span><br><span class="line">    <span class="attr">name</span>: <span class="string">&quot;王小虎&quot;</span>,</span><br><span class="line">    <span class="attr">address</span>: <span class="string">&quot;上海市普陀区金沙江路 1518 弄&quot;</span>,</span><br><span class="line">  &#125;,</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="attr">date</span>: <span class="string">&quot;2016-05-04&quot;</span>,</span><br><span class="line">    <span class="attr">name</span>: <span class="string">&quot;王小虎&quot;</span>,</span><br><span class="line">    <span class="attr">address</span>: <span class="string">&quot;上海市普陀区金沙江路 1518 弄&quot;</span>,</span><br><span class="line">  &#125;,</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="attr">date</span>: <span class="string">&quot;2016-05-01&quot;</span>,</span><br><span class="line">    <span class="attr">name</span>: <span class="string">&quot;王小虎&quot;</span>,</span><br><span class="line">    <span class="attr">address</span>: <span class="string">&quot;上海市普陀区金沙江路 1518 弄&quot;</span>,</span><br><span class="line">  &#125;,</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="attr">date</span>: <span class="string">&quot;2016-05-03&quot;</span>,</span><br><span class="line">    <span class="attr">name</span>: <span class="string">&quot;王小虎&quot;</span>,</span><br><span class="line">    <span class="attr">address</span>: <span class="string">&quot;上海市普陀区金沙江路 1518 弄&quot;</span>,</span><br><span class="line">  &#125;,</span><br><span class="line">],</span><br><span class="line"><span class="attr">dialogTableVisible</span>: <span class="literal">false</span>,</span><br></pre></td></tr></table></figure>
-
-<p><strong>完整代码如下:</strong></p>
-<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">template</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">div</span>&gt;</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">&lt;!-- Table --&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">el-button</span> <span class="attr">type</span>=<span class="string">&quot;text&quot;</span> @<span class="attr">click</span>=<span class="string">&quot;dialogTableVisible = true&quot;</span></span></span><br><span class="line"><span class="tag">      &gt;</span>打开嵌套表格的 Dialog&lt;/el-button</span><br><span class="line">    &gt;</span><br><span class="line"></span><br><span class="line">    <span class="tag">&lt;<span class="name">el-dialog</span> <span class="attr">title</span>=<span class="string">&quot;收货地址&quot;</span> <span class="attr">:visible.sync</span>=<span class="string">&quot;dialogTableVisible&quot;</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;<span class="name">el-table</span> <span class="attr">:data</span>=<span class="string">&quot;gridData&quot;</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">el-table-column</span></span></span><br><span class="line"><span class="tag">          <span class="attr">property</span>=<span class="string">&quot;date&quot;</span></span></span><br><span class="line"><span class="tag">          <span class="attr">label</span>=<span class="string">&quot;日期&quot;</span></span></span><br><span class="line"><span class="tag">          <span class="attr">width</span>=<span class="string">&quot;150&quot;</span></span></span><br><span class="line"><span class="tag">        &gt;</span><span class="tag">&lt;/<span class="name">el-table-column</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">el-table-column</span></span></span><br><span class="line"><span class="tag">          <span class="attr">property</span>=<span class="string">&quot;name&quot;</span></span></span><br><span class="line"><span class="tag">          <span class="attr">label</span>=<span class="string">&quot;姓名&quot;</span></span></span><br><span class="line"><span class="tag">          <span class="attr">width</span>=<span class="string">&quot;200&quot;</span></span></span><br><span class="line"><span class="tag">        &gt;</span><span class="tag">&lt;/<span class="name">el-table-column</span>&gt;</span></span><br><span class="line">        <span class="tag">&lt;<span class="name">el-table-column</span> <span class="attr">property</span>=<span class="string">&quot;address&quot;</span> <span class="attr">label</span>=<span class="string">&quot;地址&quot;</span>&gt;</span><span class="tag">&lt;/<span class="name">el-table-column</span>&gt;</span></span><br><span class="line">      <span class="tag">&lt;/<span class="name">el-table</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;/<span class="name">el-dialog</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">template</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">script</span>&gt;</span><span class="language-javascript"></span></span><br><span class="line"><span class="language-javascript"><span class="keyword">export</span> <span class="keyword">default</span> &#123;</span></span><br><span class="line"><span class="language-javascript">  <span class="title function_">data</span>(<span class="params"></span>) &#123;</span></span><br><span class="line"><span class="language-javascript">    <span class="keyword">return</span> &#123;</span></span><br><span class="line"><span class="language-javascript">      <span class="attr">gridData</span>: [</span></span><br><span class="line"><span class="language-javascript">        &#123;</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">date</span>: <span class="string">&quot;2016-05-02&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">name</span>: <span class="string">&quot;王小虎&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">address</span>: <span class="string">&quot;上海市普陀区金沙江路 1518 弄&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">        &#125;,</span></span><br><span class="line"><span class="language-javascript">        &#123;</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">date</span>: <span class="string">&quot;2016-05-04&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">name</span>: <span class="string">&quot;王小虎&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">address</span>: <span class="string">&quot;上海市普陀区金沙江路 1518 弄&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">        &#125;,</span></span><br><span class="line"><span class="language-javascript">        &#123;</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">date</span>: <span class="string">&quot;2016-05-01&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">name</span>: <span class="string">&quot;王小虎&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">address</span>: <span class="string">&quot;上海市普陀区金沙江路 1518 弄&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">        &#125;,</span></span><br><span class="line"><span class="language-javascript">        &#123;</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">date</span>: <span class="string">&quot;2016-05-03&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">name</span>: <span class="string">&quot;王小虎&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">          <span class="attr">address</span>: <span class="string">&quot;上海市普陀区金沙江路 1518 弄&quot;</span>,</span></span><br><span class="line"><span class="language-javascript">        &#125;,</span></span><br><span class="line"><span class="language-javascript">      ],</span></span><br><span class="line"><span class="language-javascript">      <span class="attr">dialogTableVisible</span>: <span class="literal">false</span>,</span></span><br><span class="line"><span class="language-javascript">     </span></span><br><span class="line"><span class="language-javascript">     </span></span><br><span class="line"><span class="language-javascript">    &#125;;</span></span><br><span class="line"><span class="language-javascript">  &#125;,</span></span><br><span class="line"><span class="language-javascript">  <span class="attr">methods</span>: &#123;</span></span><br><span class="line"><span class="language-javascript"></span></span><br><span class="line"><span class="language-javascript">  &#125;,</span></span><br><span class="line"><span class="language-javascript">&#125;;</span></span><br><span class="line"><span class="language-javascript"></span><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">style</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">style</span>&gt;</span></span><br></pre></td></tr></table></figure>
-
-
-<h2 id="Form-表单"><a href="#Form-表单" class="headerlink" title="Form 表单"></a>Form 表单</h2><p>  就长这样（官方图：典型表单）:<br>  <img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/0abc412ef0c72a9c2b1b7b22076cde19.png" alt="在这里插入图片描述"><br> 我们可以结合刚才写的那个对话框，就是<strong>点击之后弹出对话框，里面就是个表单。</strong><br>就用典型表单做演示罢：</p>
-<h1 id="怎么知道复制过来的标签的各个属性都是干嘛的"><a href="#怎么知道复制过来的标签的各个属性都是干嘛的" class="headerlink" title="怎么知道复制过来的标签的各个属性都是干嘛的?"></a>怎么知道复制过来的标签的各个属性都是干嘛的?</h1><p>我们以表格那个为例<br>在对应的官方文档中,滑到最底下:<br><img src="https://yts-blog.oss-cn-beijing.aliyuncs.com/e9d2263ecc9f7b2cdec5179858c6b4f6.png" alt="在这里插入图片描述"><br>Table-column Attributes就是介绍每个属性都是干嘛用的</p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">前端</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="/2024/11/04/VUE%E7%BB%84%E4%BB%B6%E5%BA%93Element%E7%9A%84%E7%AE%80%E5%8D%95%E4%BD%BF%E7%94%A8/">展开全文 >></a>
         </p>
       
 
